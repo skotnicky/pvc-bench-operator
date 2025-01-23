@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	benchmarkingv1 "github.com/Skotnicky/pvc-bench-operator/api/v1"
+	benchmarkingv1 "github.com/skotnicky/pvc-bench-operator/api/v1"
 )
 
 // PVCBenchmarkReconciler reconciles a PVCBenchmark object

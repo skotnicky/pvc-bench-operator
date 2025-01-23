@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	benchmarkingv1 "github.com/Skotnicky/pvc-bench-operator/api/v1"
+	benchmarkingv1 "github.com/skotnicky/pvc-bench-operator/api/v1"
 )
 
 var _ = Describe("PVCBenchmark Controller", func() {

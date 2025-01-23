@@ -37,8 +37,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	benchmarkingv1 "github.com/Skotnicky/pvc-bench-operator/api/v1"
-	"github.com/Skotnicky/pvc-bench-operator/internal/controller"
+	benchmarkingv1 "github.com/skotnicky/pvc-bench-operator/api/v1"
+	"github.com/skotnicky/pvc-bench-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 

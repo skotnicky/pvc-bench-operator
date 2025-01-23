@@ -32,7 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	benchmarkingv1 "github.com/Skotnicky/pvc-bench-operator/api/v1"
+	benchmarkingv1 "github.com/skotnicky/pvc-bench-operator/api/v1"
 	// +kubebuilder:scaffold:imports
 )
 

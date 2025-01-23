@@ -2,19 +2,19 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: pvcbenchmarking.k8s.io
+domain: pvcbenchmarking.taikun.cloud
 layout:
 - go.kubebuilder.io/v4
 projectName: pvc-bench-operator
-repo: github.com/Skotnicky/pvc-bench-operator
+repo: github.com/skotnicky/pvc-bench-operator
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: pvcbenchmarking.k8s.io
+  domain: pvcbenchmarking.taikun.cloud
   group: benchmarking
   kind: PVCBenchmark
-  path: github.com/Skotnicky/pvc-bench-operator/api/v1
+  path: github.com/skotnicky/pvc-bench-operator/api/v1
   version: v1
 version: "3"

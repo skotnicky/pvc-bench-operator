@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/Skotnicky/pvc-bench-operator/test/utils"
+	"github.com/skotnicky/pvc-bench-operator/test/utils"
 )
 
 // namespace where the project is deployed in
