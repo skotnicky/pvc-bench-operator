@@ -9,6 +9,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	pvcv1 "github.com/skotnicky/pvc-bench-operator/api/v1"
 	"github.com/skotnicky/pvc-bench-operator/controllers"
@@ -36,11 +37,10 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "9ebd4428.taikun.cloud",
+		Scheme:           scheme,
+		Metrics:          metricsserver.Options{BindAddress: metricsAddr},
+		LeaderElection:   enableLeaderElection,
+		LeaderElectionID: "9ebd4428.taikun.cloud",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

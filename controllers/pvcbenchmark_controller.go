@@ -115,7 +115,7 @@ func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, benchmark *pvcv
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.PersistentVolumeAccessMode(benchmark.Spec.PVC.AccessMode),
 					},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse(benchmark.Spec.PVC.Size),
 						},
