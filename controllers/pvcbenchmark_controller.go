@@ -167,6 +167,8 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
 			fioArgs = append(fioArgs,
 				"--directory=/mnt/storage",
 				"--output-format=json",
+				"--name=benchtest",
+				"--filename=/mnt/storage/testfile",
 			)
 
 			newPod := corev1.Pod{
@@ -189,7 +191,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
 					Containers: []corev1.Container{
 						{
 							Name:    "fio-benchmark",
-							Image:   "ghcr.io/your-org/fio:latest", // Replace with your actual FIO image
+							Image:   "ghcr.io/skotnicky/pvc-operator/fio", // Replace with your actual FIO image
 							Command: []string{"fio"},
 							Args:    fioArgs,
 							VolumeMounts: []corev1.VolumeMount{

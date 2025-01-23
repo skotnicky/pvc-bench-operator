@@ -1,0 +1,20 @@
+apiVersion: benchmarking.taikun.cloud/v1
+kind: PVCBenchmark
+metadata:
+  name: bandwidth-multi-pvc
+  namespace: default
+spec:
+  pvc:
+    size: 10Gi
+    accessMode: ReadWriteOnce
+  test:
+    tool: fio
+    duration: "60s"
+    parameters:
+      rw: write
+      bs: 1m
+      size: 1Gi
+      ioengine: libaio
+      direct: "1"
+  scale:
+    pvc_count: 3
