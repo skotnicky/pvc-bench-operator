@@ -2,7 +2,7 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/benchmarking.pvcbenchmarking.k8s.io_pvcbenchmarks.yaml
+- bases/benchmarking.taikun.cloud_pvcbenchmarks.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

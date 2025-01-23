@@ -2,7 +2,7 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: pvcbenchmarking.taikun.cloud
+domain: taikun.cloud
 layout:
 - go.kubebuilder.io/v4
 projectName: pvc-bench-operator
@@ -12,7 +12,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: pvcbenchmarking.taikun.cloud
+  domain: taikun.cloud
   group: benchmarking
   kind: PVCBenchmark
   path: github.com/skotnicky/pvc-bench-operator/api/v1

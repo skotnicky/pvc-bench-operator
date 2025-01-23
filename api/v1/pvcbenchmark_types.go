@@ -13,34 +13,34 @@ type PVCBenchmarkSpec struct {
 
 // PVCSpec holds the PVC configuration details
 type PVCSpec struct {
-	// Size of the PVC, e.g., "10Gi"
+	// e.g., "10Gi"
 	Size string `json:"size,omitempty"`
-	// AccessMode, e.g., "ReadWriteOnce"
+	// e.g., "ReadWriteOnce"
 	AccessMode string `json:"accessMode,omitempty"`
-	// Optional: specify a particular StorageClass
+	// Optional StorageClass
 	StorageClassName *string `json:"storageClassName,omitempty"`
 }
 
 // TestSpec holds the benchmarking tool and its parameters
 type TestSpec struct {
-	// Tool, e.g., "fio"
+	// e.g., "fio"
 	Tool string `json:"tool,omitempty"`
-	// Duration, e.g., "60s"
+	// e.g., "60s" (run for 60 seconds)
 	Duration string `json:"duration,omitempty"`
-	// Parameters is a map of key/value pairs that map to benchmarking tool flags
+	// e.g., {rw: write, bs: 1m, size: 1Gi, ioengine: libaio, direct: "1"}
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
-// ScaleSpec defines how many PVCs (and corresponding Pods) to create
+// ScaleSpec defines how many PVCs (and Pods) to create
 type ScaleSpec struct {
 	PVCCount int `json:"pvc_count,omitempty"`
 }
 
 // PVCBenchmarkStatus defines the observed state of PVCBenchmark
 type PVCBenchmarkStatus struct {
-	// Phase can be: "Pending", "Running", "Completed", "Failed"
+	// "Pending", "Running", "Completed", "Failed", etc.
 	Phase string `json:"phase,omitempty"`
-	// Results stores performance metrics, logs, or aggregated output from the benchmarking tool
+	// Map of results (like logs or summary)
 	Results map[string]string `json:"results,omitempty"`
 }
 

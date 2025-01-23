@@ -19,7 +19,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - benchmarking.pvcbenchmarking.k8s.io
+  - benchmarking.taikun.cloud
   resources:
   - pvcbenchmarks
   verbs:
@@ -31,13 +31,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - benchmarking.pvcbenchmarking.k8s.io
+  - benchmarking.taikun.cloud
   resources:
   - pvcbenchmarks/finalizers
   verbs:
   - update
 - apiGroups:
-  - benchmarking.pvcbenchmarking.k8s.io
+  - benchmarking.taikun.cloud
   resources:
   - pvcbenchmarks/status
   verbs:

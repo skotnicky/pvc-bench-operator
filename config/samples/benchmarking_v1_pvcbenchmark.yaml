@@ -1,4 +1,4 @@
-apiVersion: benchmarking.pvcbenchmarking.k8s.io/v1
+apiVersion: benchmarking.taikun.cloud/v1
 kind: PVCBenchmark
 metadata:
   labels:

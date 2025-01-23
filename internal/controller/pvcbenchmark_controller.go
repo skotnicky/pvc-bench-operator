@@ -33,9 +33,9 @@ type PVCBenchmarkReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=benchmarking.pvcbenchmarking.k8s.io,resources=pvcbenchmarks,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=benchmarking.pvcbenchmarking.k8s.io,resources=pvcbenchmarks/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=benchmarking.pvcbenchmarking.k8s.io,resources=pvcbenchmarks/finalizers,verbs=update
+// +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

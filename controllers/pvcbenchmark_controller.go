@@ -25,32 +25,31 @@ type PVCBenchmarkReconciler struct {
 	Log logr.Logger
 }
 
-//+kubebuilder:rbac:groups=benchmarking.pvcbenchmarking.k8s.io,resources=pvcbenchmarks,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=benchmarking.pvcbenchmarking.k8s.io,resources=pvcbenchmarks/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=benchmarking.pvcbenchmarking.k8s.io,resources=pvcbenchmarks/finalizers,verbs=update
+//+kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=persistentvolumeclaims;pods;events,verbs=get;list;watch;create;update;patch;delete
 
 func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// Fetch the PVCBenchmark instance
+	// 1. Fetch the PVCBenchmark instance
 	var benchmark pvcv1.PVCBenchmark
 	if err := r.Get(ctx, req.NamespacedName, &benchmark); err != nil {
 		if errors.IsNotFound(err) {
-			// The CR is deleted or not found, no action needed
+			// The CR is gone; nothing to do
 			return ctrl.Result{}, nil
 		}
-		// Other error
 		return ctrl.Result{}, err
 	}
 
-	// If the CR is marked for deletion, handle finalizers if needed
+	// 2. Check if being deleted/finalizers
 	if !benchmark.ObjectMeta.DeletionTimestamp.IsZero() {
-		// perform cleanup if needed
+		// handle finalizer/cleanup if needed
 		return ctrl.Result{}, nil
 	}
 
-	// Initialize status if not set
+	// 3. Initialize status if empty
 	if benchmark.Status.Phase == "" {
 		benchmark.Status.Phase = "Pending"
 		if err := r.Status().Update(ctx, &benchmark); err != nil {
@@ -59,26 +58,25 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	// 1. Ensure the required PVCs exist
+	// 4. Ensure the required PVCs exist
 	if err := r.ensurePVCs(ctx, &benchmark); err != nil {
 		logger.Error(err, "Failed to ensure PVCs")
 		return ctrl.Result{}, err
 	}
 
-	// 2. Ensure benchmarking pods exist
+	// 5. Ensure benchmarking Pods exist
 	if err := r.ensureBenchmarkPods(ctx, &benchmark); err != nil {
-		logger.Error(err, "Failed to ensure benchmarking pods")
+		logger.Error(err, "Failed to ensure benchmark pods")
 		return ctrl.Result{}, err
 	}
 
-	// 3. Check pod statuses & collect results if all are complete
+	// 6. Check if Pods completed & gather results
 	completed, results, err := r.checkAndCollectResults(ctx, &benchmark)
 	if err != nil {
 		logger.Error(err, "Error collecting results")
 		return ctrl.Result{}, err
 	}
 	if completed {
-		// Update the status with results
 		benchmark.Status.Phase = "Completed"
 		benchmark.Status.Results = results
 		if err := r.Status().Update(ctx, &benchmark); err != nil {
@@ -86,17 +84,13 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, err
 		}
 
-		// Optional: Cleanup resources (PVCs & Pods) if you want ephemeral usage
-		// err := r.cleanupResources(ctx, &benchmark)
-		// if err != nil {
-		//     return ctrl.Result{}, err
-		// }
-		// logger.Info("Cleaned up all resources")
+		// (Optional) Cleanup resources if ephemeral usage is desired
+		// r.cleanupResources(ctx, &benchmark)
 
 		return ctrl.Result{}, nil
 	}
 
-	// Not all pods are complete; requeue after 10s to check again
+	// Requeue after 10s if not done
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
@@ -111,7 +105,7 @@ func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, benchmark *pvcv
 			Name:      pvcName,
 		}, &pvc)
 		if err != nil && errors.IsNotFound(err) {
-			// Need to create the PVC
+			// Create a new PVC
 			newPVC := corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      pvcName,
@@ -133,16 +127,14 @@ func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, benchmark *pvcv
 				newPVC.Spec.StorageClassName = benchmark.Spec.PVC.StorageClassName
 			}
 
-			// Make PVC owned by the CR
+			// Make PVC owned by CR
 			if err := controllerutil.SetControllerReference(benchmark, &newPVC, r.Scheme()); err != nil {
 				return err
 			}
-
 			if err := r.Create(ctx, &newPVC); err != nil {
 				return err
 			}
 		} else if err != nil {
-			// Other error
 			return err
 		}
 		// If PVC found, do nothing
@@ -150,7 +142,7 @@ func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, benchmark *pvcv
 	return nil
 }
 
-// ensureBenchmarkPods creates or ensures the existence of Pods that run the benchmarking tool
+// ensureBenchmarkPods creates Pods that mount each PVC and run fio
 func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchmark *pvcv1.PVCBenchmark) error {
 	for i := 0; i < benchmark.Spec.Scale.PVCCount; i++ {
 		podName := fmt.Sprintf("%s-bench-%d", benchmark.Name, i)
@@ -162,15 +154,20 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
 			Name:      podName,
 		}, &pod)
 		if err != nil && errors.IsNotFound(err) {
-			// Construct Pod that runs fio with the given parameters
+			// Build fio args from spec
 			fioArgs := buildFioArgs(benchmark.Spec.Test.Parameters)
-			// Optionally add duration if specified
+			// Optionally add duration
 			if benchmark.Spec.Test.Duration != "" {
-				fioArgs = append(fioArgs, fmt.Sprintf("--runtime=%s", benchmark.Spec.Test.Duration))
-				fioArgs = append(fioArgs, "--time_based")
+				fioArgs = append(fioArgs,
+					fmt.Sprintf("--runtime=%s", benchmark.Spec.Test.Duration),
+					"--time_based",
+				)
 			}
-			fioArgs = append(fioArgs, "--directory=/mnt/storage")
-			fioArgs = append(fioArgs, "--output-format=json") // easier to parse if you want logs
+			// Add output directory and format
+			fioArgs = append(fioArgs,
+				"--directory=/mnt/storage",
+				"--output-format=json",
+			)
 
 			newPod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -192,7 +189,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
 					Containers: []corev1.Container{
 						{
 							Name:    "fio-benchmark",
-							Image:   "ghcr.io/your-org/fio:latest", // Replace with your actual fio image
+							Image:   "ghcr.io/your-org/fio:latest", // Replace with your actual FIO image
 							Command: []string{"fio"},
 							Args:    fioArgs,
 							VolumeMounts: []corev1.VolumeMount{
@@ -206,16 +203,14 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
 				},
 			}
 
-			// Make Pod owned by the CR
+			// Make Pod owned by CR
 			if err := controllerutil.SetControllerReference(benchmark, &newPod, r.Scheme()); err != nil {
 				return err
 			}
-
 			if err := r.Create(ctx, &newPod); err != nil {
 				return err
 			}
 		} else if err != nil {
-			// Other error
 			return err
 		}
 		// If Pod found, do nothing
@@ -223,7 +218,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
 	return nil
 }
 
-// checkAndCollectResults checks whether all Pods are completed and aggregates results
+// checkAndCollectResults checks if all Pods are done and gathers results
 func (r *PVCBenchmarkReconciler) checkAndCollectResults(ctx context.Context, benchmark *pvcv1.PVCBenchmark) (bool, map[string]string, error) {
 	results := make(map[string]string)
 	completedCount := 0
@@ -232,28 +227,19 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(ctx context.Context, ben
 	for i := 0; i < total; i++ {
 		podName := fmt.Sprintf("%s-bench-%d", benchmark.Name, i)
 		var pod corev1.Pod
-		err := r.Get(ctx, types.NamespacedName{
+		if err := r.Get(ctx, types.NamespacedName{
 			Namespace: benchmark.Namespace,
 			Name:      podName,
-		}, &pod)
-		if err != nil {
+		}, &pod); err != nil {
 			return false, nil, err
 		}
 
+		// If Pod is succeeded/failed, it's done
 		switch pod.Status.Phase {
 		case corev1.PodSucceeded, corev1.PodFailed:
-			// Pod is done
 			completedCount++
-			// (Optional) Retrieve logs to parse results
-			// logs, logErr := r.getPodLogs(ctx, pod)
-			// if logErr == nil {
-			//     results[podName] = logs
-			// } else {
-			//     results[podName] = fmt.Sprintf("Error reading logs: %v", logErr)
-			// }
-			// For now, just store the phase
+			// Minimal example: store Pod phase in results
 			results[podName] = string(pod.Status.Phase)
-
 		default:
 			// Pod is still Running or Pending
 		}
@@ -269,35 +255,16 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(ctx context.Context, ben
 func buildFioArgs(params map[string]string) []string {
 	var args []string
 	for k, v := range params {
-		// e.g., {rw: read, bs: 4k} -> ["--rw=read", "--bs=4k"]
+		// e.g., { rw: read, bs: 4k } -> ["--rw=read", "--bs=4k"]
 		args = append(args, fmt.Sprintf("--%s=%s", k, v))
 	}
 	return args
 }
 
-// (Optional) gather logs from the Pod to parse fio JSON
-/*
-func (r *PVCBenchmarkReconciler) getPodLogs(ctx context.Context, pod corev1.Pod) (string, error) {
-    req := r.Clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{})
-    stream, err := req.Stream(ctx)
-    if err != nil {
-        return "", err
-    }
-    defer stream.Close()
-
-    buf, err := io.ReadAll(stream)
-    if err != nil {
-        return "", err
-    }
-    return string(buf), nil
-}
-*/
-
-// (Optional) cleanup after completion
+// (Optional) cleanupResources to delete Pods/PVCs after test
 /*
 func (r *PVCBenchmarkReconciler) cleanupResources(ctx context.Context, benchmark *pvcv1.PVCBenchmark) error {
-    // Delete all Pods and PVCs
-    // ...
+    // e.g., loop and delete all pods/pvcs
     return nil
 }
 */

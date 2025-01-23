@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.1
-  name: pvcbenchmarks.benchmarking.pvcbenchmarking.k8s.io
+  name: pvcbenchmarks.benchmarking.taikun.cloud
 spec:
-  group: benchmarking.pvcbenchmarking.k8s.io
+  group: benchmarking.taikun.cloud
   names:
     kind: PVCBenchmark
     listKind: PVCBenchmarkList
@@ -43,18 +43,17 @@ spec:
                 description: PVCSpec holds the PVC configuration details
                 properties:
                   accessMode:
-                    description: AccessMode, e.g., "ReadWriteOnce"
+                    description: e.g., "ReadWriteOnce"
                     type: string
                   size:
-                    description: Size of the PVC, e.g., "10Gi"
+                    description: e.g., "10Gi"
                     type: string
                   storageClassName:
-                    description: 'Optional: specify a particular StorageClass'
+                    description: Optional StorageClass
                     type: string
                 type: object
               scale:
-                description: ScaleSpec defines how many PVCs (and corresponding Pods)
-                  to create
+                description: ScaleSpec defines how many PVCs (and Pods) to create
                 properties:
                   pvc_count:
                     type: integer
@@ -63,16 +62,16 @@ spec:
                 description: TestSpec holds the benchmarking tool and its parameters
                 properties:
                   duration:
-                    description: Duration, e.g., "60s"
+                    description: e.g., "60s" (run for 60 seconds)
                     type: string
                   parameters:
                     additionalProperties:
                       type: string
-                    description: Parameters is a map of key/value pairs that map to
-                      benchmarking tool flags
+                    description: 'e.g., {rw: write, bs: 1m, size: 1Gi, ioengine: libaio,
+                      direct: "1"}'
                     type: object
                   tool:
-                    description: Tool, e.g., "fio"
+                    description: e.g., "fio"
                     type: string
                 type: object
             type: object
@@ -80,13 +79,12 @@ spec:
             description: PVCBenchmarkStatus defines the observed state of PVCBenchmark
             properties:
               phase:
-                description: 'Phase can be: "Pending", "Running", "Completed", "Failed"'
+                description: '"Pending", "Running", "Completed", "Failed", etc.'
                 type: string
               results:
                 additionalProperties:
                   type: string
-                description: Results stores performance metrics, logs, or aggregated
-                  output from the benchmarking tool
+                description: Map of results (like logs or summary)
                 type: object
             type: object
         type: object
