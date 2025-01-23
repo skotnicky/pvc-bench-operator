@@ -1,0 +1,46 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - persistentvolumeclaims
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmarking.pvcbenchmarking.k8s.io
+  resources:
+  - pvcbenchmarks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmarking.pvcbenchmarking.k8s.io
+  resources:
+  - pvcbenchmarks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - benchmarking.pvcbenchmarking.k8s.io
+  resources:
+  - pvcbenchmarks/status
+  verbs:
+  - get
+  - patch
+  - update

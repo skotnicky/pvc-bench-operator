@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- benchmarking_v1_pvcbenchmark.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
