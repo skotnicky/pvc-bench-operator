@@ -42,6 +42,18 @@ type PVCBenchmarkStatus struct {
 	Phase string `json:"phase,omitempty"`
 	// Map of results (like logs or summary)
 	Results map[string]string `json:"results,omitempty"`
+	ReadIOPS    Metrics           `json:"readIOPS,omitempty"`
+   	WriteIOPS   Metrics           `json:"writeIOPS,omitempty"`
+    	Latency     Metrics           `json:"latency,omitempty"`
+    	Bandwidth   Metrics           `json:"bandwidth,omitempty"`
+}
+
+// Metrics defines the structure for storing min, max, avg, and sum values
+type Metrics struct {
+    Min string `json:"min,omitempty"`
+    Max string `json:"max,omitempty"`
+    Avg string `json:"avg,omitempty"`
+    Sum string `json:"sum,omitempty"`
 }
 
 //+kubebuilder:object:root=true

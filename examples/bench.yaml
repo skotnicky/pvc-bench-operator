@@ -17,4 +17,4 @@ spec:
       ioengine: libaio
       direct: "1"
   scale:
-    pvc_count: 3
+    pvc_count: 30

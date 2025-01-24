@@ -78,13 +78,65 @@ spec:
           status:
             description: PVCBenchmarkStatus defines the observed state of PVCBenchmark
             properties:
+              bandwidth:
+                description: Metrics defines the structure for storing min, max, avg,
+                  and sum values
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+              latency:
+                description: Metrics defines the structure for storing min, max, avg,
+                  and sum values
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
               phase:
                 description: '"Pending", "Running", "Completed", "Failed", etc.'
                 type: string
+              readIOPS:
+                description: Metrics defines the structure for storing min, max, avg,
+                  and sum values
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
               results:
                 additionalProperties:
                   type: string
                 description: Map of results (like logs or summary)
+                type: object
+              writeIOPS:
+                description: Metrics defines the structure for storing min, max, avg,
+                  and sum values
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
                 type: object
             type: object
         type: object
