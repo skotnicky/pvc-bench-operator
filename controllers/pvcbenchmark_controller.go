@@ -175,6 +175,9 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: benchmark.Namespace,
+					Labels: map[string]string{
+						"app": "pvc-bench-fio",
+					},
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
