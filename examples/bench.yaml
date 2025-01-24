@@ -2,7 +2,7 @@ apiVersion: benchmarking.taikun.cloud/v1
 kind: PVCBenchmark
 metadata:
   name: bandwidth-multi-pvc
-  namespace: default
+  namespace: pvc-bench-operator-system
 spec:
   pvc:
     size: 10Gi
@@ -17,4 +17,4 @@ spec:
       ioengine: libaio
       direct: "1"
   scale:
-    pvc_count: 30
+    pvc_count: 15
