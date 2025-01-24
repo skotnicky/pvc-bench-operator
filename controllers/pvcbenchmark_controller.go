@@ -188,6 +188,35 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
 							},
 						},
 					},
+					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+						{
+           					     MaxSkew: 1,
+     					             TopologyKey: "kubernetes.io/hostname",
+            					     WhenUnsatisfiable: corev1.ScheduleAnyway, // <-- Allow scheduling even if constraints aren't perfectly met
+            				             LabelSelector: &metav1.LabelSelector{
+               						     MatchLabels: map[string]string{
+                     						   "app": "pvc-bench-fio",
+                   							 },
+          						      },
+           					 },
+       					 },
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+								{
+									Weight: 100,
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												"app": "pvc-bench-fio",
+											},
+										},
+										TopologyKey: "kubernetes.io/hostname",
+									},
+								},
+							},
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:    "fio-benchmark",
