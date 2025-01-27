@@ -1,135 +1,125 @@
-# pvc-bench-operator
-// TODO(user): Add simple overview of use/purpose
+# PVC Bench Operator
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+The PVC Bench Operator is a Kubernetes operator designed to streamline the benchmarking of Persistent Volume Claims (PVCs) within Kubernetes clusters. It automates the deployment and management of benchmarking tools, enabling users to efficiently assess the performance of their storage solutions.
 
-## Getting Started
+## Features
 
-### Prerequisites
-- go version v1.23.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+- **Automated Benchmark Deployment**: Simplifies the setup of benchmarking tools for PVCs.
+- **Custom Resource Definitions (CRDs)**: Introduces CRDs to manage benchmark configurations.
+- **Scalability**: Supports benchmarking across multiple PVCs simultaneously.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+## Prerequisites
 
-```sh
-make docker-build docker-push IMG=<some-registry>/pvc-bench-operator:tag
-```
+Before deploying the PVC Bench Operator, ensure you have the following:
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+- **Go**: Version 1.23.0 or higher.
+- **Docker**: Version 17.03 or higher.
+- **Kubectl**: Version 1.11.3 or higher.
+- **Kubernetes Cluster**: Access to a Kubernetes cluster running version 1.11.3 or higher.
 
-**Install the CRDs into the cluster:**
+## Installation
 
-```sh
-make install
-```
+1. **Clone the Repository**:
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+   ```bash
+   git clone https://github.com/skotnicky/pvc-bench-operator.git
+   cd pvc-bench-operator
+   ```
 
-```sh
-make deploy IMG=<some-registry>/pvc-bench-operator:tag
-```
+2. **Build and Push the Docker Image**:
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+   Replace `<your-registry>` with your Docker registry and `<tag>` with your desired image tag.
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+   ```bash
+   make docker-build docker-push IMG=<your-registry>/pvc-bench-operator:<tag>
+   ```
 
-```sh
-kubectl apply -k config/samples/
-```
+3. **Deploy the Operator to Your Kubernetes Cluster**:
 
->**NOTE**: Ensure that the samples has default values to test it out.
+   ```bash
+   make deploy IMG=<your-registry>/pvc-bench-operator:<tag>
+   ```
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+## Using the `/dist` Directory
 
-```sh
-kubectl delete -k config/samples/
-```
+The `/dist` directory contains pre-built manifests and helper files to facilitate quick deployment and testing of the PVC Bench Operator. Here's how to use it:
 
-**Delete the APIs(CRDs) from the cluster:**
+1. **Navigate to the ********************`/dist`******************** Directory**:
 
-```sh
-make uninstall
-```
+   ```bash
+   cd dist
+   ```
 
-**UnDeploy the controller from the cluster:**
+2. **Apply Pre-Built Kubernetes Manifests**:
 
-```sh
-make undeploy
-```
+   Use the `install.yaml` manifest to deploy the operator and its associated resources directly:
 
-## Project Distribution
+   ```bash
+   kubectl apply -f install.yaml
+   ```
 
-Following the options to release and provide this solution to the users.
+   This will deploy the PVC Bench Operator using the pre-built configuration provided in the `/dist` directory.
 
-### By providing a bundle with all YAML files
+3. **Customize Resources**:
 
-1. Build the installer for the image built and published in the registry:
+   If needed, edit the `install.yaml` file in the `/dist` directory to suit your environment:
 
-```sh
-make build-installer IMG=<some-registry>/pvc-bench-operator:tag
-```
+   ```bash
+   vim install.yaml
+   ```
 
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
+   Adjust any configuration options, such as namespace, image tags, or resource limits, before applying the manifest.
 
-2. Using the installer
+4. **Verify Deployment**:
 
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
+   Check the status of the operator to ensure it's running correctly:
 
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/pvc-bench-operator/<tag or branch>/dist/install.yaml
-```
+   ```bash
+   kubectl get pods -n <operator-namespace>
+   ```
 
-### By providing a Helm Chart
+## Usage
 
-1. Build the chart using the optional helm plugin
+Once deployed, you can define a `PVCBenchmark` custom resource to specify the PVCs you wish to benchmark. The operator will handle the deployment of benchmarking pods and collect performance metrics.
 
-```sh
-kubebuilder edit --plugins=helm/v1-alpha
-```
+For detailed configuration options and examples, please refer to the [examples](https://github.com/skotnicky/pvc-bench-operator/tree/main/examples) directory in the repository.
 
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
+## Get Results
 
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
+After running a benchmark, you can retrieve the results using the following commands:
+
+1. **List Benchmark Resources**:
+
+   ```bash
+   kubectl get pvcbenchmarks -n <operator-namespace>
+   ```
+
+   This will display the benchmark resources managed by the operator.
+
+2. **Describe a Benchmark Resource**:
+
+   ```bash
+   kubectl describe pvcbenchmark <benchmark-name> -n <operator-namespace>
+   ```
+
+   This provides detailed information about the benchmark, including its status and results.
+
+3. **Check Pod Logs**:
+
+   For more granular details, check the logs of the benchmarking pods:
+
+   ```bash
+   kubectl logs <pod-name> -n <operator-namespace>
+   ```
+
+   Replace `<pod-name>` with the name of the pod running the benchmark.
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+Contributions are welcome! Please open an issue or submit a pull request with your improvements or bug fixes.
 
 ## License
 
-Copyright 2025.
+This project is licensed under the Apache 2.0 License. See the [LICENSE](https://github.com/skotnicky/pvc-bench-operator/blob/main/LICENSE) file for details.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
+---
