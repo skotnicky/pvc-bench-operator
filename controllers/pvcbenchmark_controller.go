@@ -200,6 +200,35 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
 							},
 						},
 					},
+					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+                        		{
+                           			 MaxSkew: 1,
+                       				 TopologyKey: "kubernetes.io/hostname",
+                                		 WhenUnsatisfiable: corev1.ScheduleAnyway, // <-- Allow scheduling even if constraints aren't perfectly met
+                        			 LabelSelector: &metav1.LabelSelector{
+                               				 MatchLabels: map[string]string{
+                                  			  "app": "pvc-bench-fio",
+                               				 },
+                           			 },
+                       		          },
+                 			},
+                    			Affinity: &corev1.Affinity{
+                       				 PodAntiAffinity: &corev1.PodAntiAffinity{
+                        			    PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+                               				 {
+                                   			 Weight: 100,
+                                			 PodAffinityTerm: corev1.PodAffinityTerm{
+                                        		 LabelSelector: &metav1.LabelSelector{
+                                            		 MatchLabels: map[string]string{
+                                               			  "app": "pvc-bench-fio",
+                                           		 		},
+                                       				 },
+                                      		 		 TopologyKey: "kubernetes.io/hostname",
+                                   				 },
+                               				 },
+                           			 },
+                       			},
+				},
 					Containers: []corev1.Container{
 						{
 							Name:    "fio-benchmark",
@@ -291,8 +320,8 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
 				// from your sample, "write" has iops=185.33, bw=189778
 				// You might treat lat = j.Write.clat_ns.mean, etc.
 				// For brevity, let's treat "lat" as the write's clat_ns.mean
-				latVal := j.Write.ClatNs.Mean
-				bwVal := float64(j.Write.Bw) // KB/s
+				latVal := j.Write.ClatNs.Mean / 1000000.0 // ns to ms
+				bwVal := float64(j.Write.Bw) / 1024.0  // KB/s to MB/s
 
 				// Aggregation
 				readIopsAgg.Add(readIopsVal)
@@ -301,7 +330,7 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
 				bwAgg.Add(bwVal)
 
 				results[podName] = fmt.Sprintf(
-					"ReadIOPS=%.2f, WriteIOPS=%.2f, Lat=%.2f ns, BW=%.2f KB/s",
+					"ReadIOPS=%.2f, WriteIOPS=%.2f, Lat=%.2f ms, BW=(%.2f) MB/s",
 					readIopsVal, writeIopsVal, latVal, bwVal,
 				)
 			} else {

@@ -1,0 +1,478 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+    control-plane: controller-manager
+  name: pvc-bench-operator-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: pvcbenchmarks.benchmarking.taikun.cloud
+spec:
+  group: benchmarking.taikun.cloud
+  names:
+    kind: PVCBenchmark
+    listKind: PVCBenchmarkList
+    plural: pvcbenchmarks
+    singular: pvcbenchmark
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: PVCBenchmark is the Schema for the pvcbenchmarks API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PVCBenchmarkSpec is the desired state
+            properties:
+              pvc:
+                description: PVCSpec defines the PVC characteristics (size, mode,
+                  etc.)
+                properties:
+                  accessMode:
+                    type: string
+                  size:
+                    type: string
+                  storageClassName:
+                    type: string
+                type: object
+              scale:
+                description: ScaleSpec defines how many PVCs/Pods to create
+                properties:
+                  pvc_count:
+                    type: integer
+                type: object
+              test:
+                description: TestSpec defines the FIO test parameters
+                properties:
+                  duration:
+                    type: string
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  tool:
+                    type: string
+                type: object
+            type: object
+          status:
+            description: PVCBenchmarkStatus is the observed state
+            properties:
+              bandwidth:
+                description: Metrics is a structure to hold min, max, sum, avg strings
+                  (or floats)
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+              latency:
+                description: Metrics is a structure to hold min, max, sum, avg strings
+                  (or floats)
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+              phase:
+                type: string
+              readIOPS:
+                description: Metrics is a structure to hold min, max, sum, avg strings
+                  (or floats)
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+              results:
+                additionalProperties:
+                  type: string
+                type: object
+              writeIOPS:
+                description: Metrics is a structure to hold min, max, sum, avg strings
+                  (or floats)
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+  name: pvc-bench-operator-controller-manager
+  namespace: pvc-bench-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+  name: pvc-bench-operator-leader-election-role
+  namespace: pvc-bench-operator-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pvc-bench-operator-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - persistentvolumeclaims
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pvc-bench-operator-metrics-auth-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pvc-bench-operator-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+  name: pvc-bench-operator-pvcbenchmark-admin-role
+rules:
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks
+  verbs:
+  - '*'
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+  name: pvc-bench-operator-pvcbenchmark-editor-role
+rules:
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+  name: pvc-bench-operator-pvcbenchmark-viewer-role
+rules:
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+  name: pvc-bench-operator-leader-election-rolebinding
+  namespace: pvc-bench-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pvc-bench-operator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: pvc-bench-operator-controller-manager
+  namespace: pvc-bench-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+  name: pvc-bench-operator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pvc-bench-operator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: pvc-bench-operator-controller-manager
+  namespace: pvc-bench-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pvc-bench-operator-metrics-auth-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pvc-bench-operator-metrics-auth-role
+subjects:
+- kind: ServiceAccount
+  name: pvc-bench-operator-controller-manager
+  namespace: pvc-bench-operator-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+    control-plane: controller-manager
+  name: pvc-bench-operator-controller-manager-metrics-service
+  namespace: pvc-bench-operator-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    app.kubernetes.io/name: pvc-bench-operator
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: pvc-bench-operator
+    control-plane: controller-manager
+  name: pvc-bench-operator-controller-manager
+  namespace: pvc-bench-operator-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pvc-bench-operator
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        app.kubernetes.io/name: pvc-bench-operator
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --metrics-bind-address=:8443
+        - --leader-elect
+        - --health-probe-bind-address=:8081
+        command:
+        - /manager
+        image: ghcr.io/skotnicky/pvc-operator:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        ports: []
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts: []
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: pvc-bench-operator-controller-manager
+      terminationGracePeriodSeconds: 10
+      volumes: []
