@@ -5,6 +5,8 @@
 domain: taikun.cloud
 layout:
 - go.kubebuilder.io/v4
+plugins:
+  helm.kubebuilder.io/v1-alpha: {}
 projectName: pvc-bench-operator
 repo: github.com/skotnicky/pvc-bench-operator
 resources:

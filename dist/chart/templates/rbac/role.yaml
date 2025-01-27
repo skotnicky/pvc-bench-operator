@@ -1,0 +1,56 @@
+{{- if .Values.rbac.enable }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+  name: pvc-bench-operator-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - persistentvolumeclaims
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - benchmarking.taikun.cloud
+  resources:
+  - pvcbenchmarks/status
+  verbs:
+  - get
+  - patch
+  - update
+{{- end -}}

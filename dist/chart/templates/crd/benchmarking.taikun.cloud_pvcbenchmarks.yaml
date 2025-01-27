@@ -1,0 +1,145 @@
+{{- if .Values.crd.enable }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: pvcbenchmarks.benchmarking.taikun.cloud
+spec:
+  group: benchmarking.taikun.cloud
+  names:
+    kind: PVCBenchmark
+    listKind: PVCBenchmarkList
+    plural: pvcbenchmarks
+    singular: pvcbenchmark
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: PVCBenchmark is the Schema for the pvcbenchmarks API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PVCBenchmarkSpec is the desired state
+            properties:
+              pvc:
+                description: PVCSpec defines the PVC characteristics (size, mode,
+                  etc.)
+                properties:
+                  accessMode:
+                    type: string
+                  size:
+                    type: string
+                  storageClassName:
+                    type: string
+                type: object
+              scale:
+                description: ScaleSpec defines how many PVCs/Pods to create
+                properties:
+                  pvc_count:
+                    type: integer
+                type: object
+              test:
+                description: TestSpec defines the FIO test parameters
+                properties:
+                  duration:
+                    type: string
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  tool:
+                    type: string
+                type: object
+            type: object
+          status:
+            description: PVCBenchmarkStatus is the observed state
+            properties:
+              bandwidth:
+                description: Metrics is a structure to hold min, max, sum, avg strings
+                  (or floats)
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+              latency:
+                description: Metrics is a structure to hold min, max, sum, avg strings
+                  (or floats)
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+              phase:
+                type: string
+              readIOPS:
+                description: Metrics is a structure to hold min, max, sum, avg strings
+                  (or floats)
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+              results:
+                additionalProperties:
+                  type: string
+                type: object
+              writeIOPS:
+                description: Metrics is a structure to hold min, max, sum, avg strings
+                  (or floats)
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+{{- end -}}
