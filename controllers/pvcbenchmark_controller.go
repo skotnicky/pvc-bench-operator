@@ -184,6 +184,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
                 "--output-format=json",
                 "--name=benchtest",
                 "--filename=/mnt/storage/testfile",
+		"--group_reporting",
             )
 
             newPod := corev1.Pod{
