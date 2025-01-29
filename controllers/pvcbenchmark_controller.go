@@ -27,9 +27,7 @@ import (
 // +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/finalizers,verbs=update
-
-// Access to pods/pvc/etc:
-//
+// +kubebuilder:rbac:groups="",resources=namespaces;pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims;pods;events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
 
@@ -180,12 +178,18 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
                 fioArgs = append(fioArgs, fmt.Sprintf("--runtime=%s", benchmark.Spec.Test.Duration), "--time_based")
             }
             fioArgs = append(fioArgs,
-                "--directory=/mnt/storage",
+	    	"--directory=/mnt/storage",
                 "--output-format=json",
                 "--name=benchtest",
                 "--filename=/mnt/storage/testfile",
 		"--group_reporting",
             )
+	    readinessCheckArgs := []string{
+                benchmark.Namespace,
+                "app=pvc-bench-fio",
+                strconv.Itoa(benchmark.Spec.Scale.PVCCount),
+	    }
+	    readinessCheckArgs = append(readinessCheckArgs, fioArgs...)
 
             newPod := corev1.Pod{
                 ObjectMeta: metav1.ObjectMeta{
@@ -196,6 +200,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
                     },
                 },
                 Spec: corev1.PodSpec{
+			ServiceAccountName: "pvc-bench-operator-controller-manager",
                     RestartPolicy: corev1.RestartPolicyNever,
                     Volumes: []corev1.Volume{
                         {
@@ -240,9 +245,9 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
                     Containers: []corev1.Container{
                         {
                             Name:    "fio-benchmark",
-                            Image:   "ghcr.io/skotnicky/pvc-operator/fio:latest",
-                            Command: []string{"fio"},
-                            Args:    fioArgs,
+                            Image:   "ghcr.io/skotnicky/pvc-bench-operator/fio:latest",
+			    Command: []string{"/usr/local/bin/check_pods_ready.sh"},
+                            Args: readinessCheckArgs,
                             VolumeMounts: []corev1.VolumeMount{
                                 {
                                     Name:      "pvc-volume",
