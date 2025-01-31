@@ -55,6 +55,7 @@ type PVCBenchmarkStatus struct {
     WriteLatency   Metrics `json:"writeLatency,omitempty"`
     ReadBandwidth  Metrics `json:"readBandwidth,omitempty"`
     WriteBandwidth Metrics `json:"writeBandwidth,omitempty"`
+    CPUUsage	   Metrics `json:"cpuUsage,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -82,6 +82,7 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
     readIOPS, writeIOPS,
     readLat, writeLat,
     readBW, writeBW,
+    cpu,
     err := r.checkAndCollectResults(ctx, &benchmark)
     if err != nil {
         logger.Error(err, "Error collecting results")
@@ -99,6 +100,7 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
         benchmark.Status.WriteLatency = writeLat
         benchmark.Status.ReadBandwidth = readBW
         benchmark.Status.WriteBandwidth = writeBW
+	benchmark.Status.CPUUsage = cpu
 
         if err := r.Status().Update(ctx, &benchmark); err != nil {
             logger.Error(err, "Failed to update CR status=Completed")
@@ -280,6 +282,7 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
     pvcv1.Metrics, pvcv1.Metrics,  // readIOPS, writeIOPS
     pvcv1.Metrics, pvcv1.Metrics,  // readLat, writeLat
     pvcv1.Metrics, pvcv1.Metrics,  // readBW, writeBW
+    pvcv1.Metrics,		   // cpu
     error,
 ) {
 
@@ -297,6 +300,8 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
     readBwAgg := newStatAgg()
     writeBwAgg := newStatAgg()
 
+    cpuAgg := newStatAgg()
+
     // Build a clientset for logs
     config, err := rest.InClusterConfig()
     if err != nil {
@@ -304,6 +309,7 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
             pvcv1.Metrics{}, pvcv1.Metrics{},
             pvcv1.Metrics{}, pvcv1.Metrics{},
             pvcv1.Metrics{}, pvcv1.Metrics{},
+	    pvcv1.Metrics{},
             err
     }
     clientset, err := kubernetes.NewForConfig(config)
@@ -312,6 +318,7 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
             pvcv1.Metrics{}, pvcv1.Metrics{},
             pvcv1.Metrics{}, pvcv1.Metrics{},
             pvcv1.Metrics{}, pvcv1.Metrics{},
+	    pvcv1.Metrics{},
             err
     }
 
@@ -326,6 +333,7 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
                 pvcv1.Metrics{}, pvcv1.Metrics{},
                 pvcv1.Metrics{}, pvcv1.Metrics{},
                 pvcv1.Metrics{}, pvcv1.Metrics{},
+		pvcv1.Metrics{},
                 err
         }
 
@@ -368,11 +376,15 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
                 readLatAgg.Add(readLatVal)
                 writeLatAgg.Add(writeLatVal)
 
+		cpuVal := j.UsrCpu + j.SysCpu
+                cpuAgg.Add(cpuVal)
+
                 // Per-pod text summary
                 results[podName] = fmt.Sprintf(
-                    "READ => IOPS=%.2f, Lat=%.2f ms, BW=%.2f MB/s; WRITE => IOPS=%.2f, Lat=%.2f ms, BW=%.2f MB/s",
+                    "READ => IOPS=%.2f, Lat=%.2f ms, BW=%.2f MB/s; WRITE => IOPS=%.2f, Lat=%.2f ms, BW=%.2f MB/s, CPU Usage=%.2f",
                     readIopsVal, readLatVal, readBwVal,
                     writeIopsVal, writeLatVal, writeBwVal,
+		    cpuVal,
                 )
             } else {
                 results[podName] = string(logs)
@@ -418,13 +430,20 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
             Sum: formatFloat(writeBwAgg.Sum),
             Avg: formatFloat(writeBwAgg.Avg()),
         }
-        return true, results, readIOPS, writeIOPS, readLat, writeLat, readBw, writeBw, nil
+	cpuUsage := pvcv1.Metrics{
+            Min: formatFloat(cpuAgg.Min),
+            Max: formatFloat(cpuAgg.Max),
+            Sum: formatFloat(cpuAgg.Sum),
+            Avg: formatFloat(cpuAgg.Avg()),
+        }
+        return true, results, readIOPS, writeIOPS, readLat, writeLat, readBw, writeBw, cpuUsage, nil
     }
 
     return false, results,
         pvcv1.Metrics{}, pvcv1.Metrics{},
         pvcv1.Metrics{}, pvcv1.Metrics{},
         pvcv1.Metrics{}, pvcv1.Metrics{},
+	pvcv1.Metrics{},
         nil
 }
 
@@ -508,14 +527,16 @@ type FioJSON struct {
             Iops float64 `json:"iops"`
             ClatNs struct {
                 Mean float64 `json:"mean"`
-            } `json:"clat_ns"`
+            } `json:"lat_ns"`
         } `json:"read"`
         Write struct {
             Bw   int64   `json:"bw"`
             Iops float64 `json:"iops"`
             ClatNs struct {
                 Mean float64 `json:"mean"`
-            } `json:"clat_ns"`
+            } `json:"lat_ns"`
         } `json:"write"`
+	UsrCpu float64 `json:"usr_cpu"`
+        SysCpu float64 `json:"sys_cpu"`
     } `json:"jobs"`
 }

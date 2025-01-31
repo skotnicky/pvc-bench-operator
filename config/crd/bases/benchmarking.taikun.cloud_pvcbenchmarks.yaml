@@ -79,6 +79,18 @@ spec:
           status:
             description: PVCBenchmarkStatus is the observed state
             properties:
+              cpuUsage:
+                description: Metrics holds min, max, sum, average for a single metric
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
               phase:
                 type: string
               readBandwidth:
