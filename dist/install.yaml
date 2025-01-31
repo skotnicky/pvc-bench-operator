@@ -45,17 +45,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: PVCBenchmarkSpec is the desired state
+            description: PVCBenchmarkSpec is the desired state of the CR
             properties:
               pvc:
                 description: PVCSpec defines the PVC characteristics (size, mode,
                   etc.)
                 properties:
                   accessMode:
+                    description: e.g., "ReadWriteOnce"
                     type: string
                   size:
+                    description: e.g., "10Gi"
                     type: string
                   storageClassName:
+                    description: 'Optional: set a StorageClass'
                     type: string
                 type: object
               scale:
@@ -68,49 +71,50 @@ spec:
                 description: TestSpec defines the FIO test parameters
                 properties:
                   duration:
+                    description: e.g., "60s"
                     type: string
                   parameters:
                     additionalProperties:
                       type: string
+                    description: 'FIO parameters, e.g. {rw: randrw, bs: 4k, size:
+                      1Gi}'
                     type: object
                   tool:
+                    description: e.g., "fio"
                     type: string
                 type: object
             type: object
           status:
             description: PVCBenchmarkStatus is the observed state
             properties:
-              bandwidth:
-                description: Metrics is a structure to hold min, max, sum, avg strings
-                  (or floats)
-                properties:
-                  avg:
-                    type: string
-                  max:
-                    type: string
-                  min:
-                    type: string
-                  sum:
-                    type: string
-                type: object
-              latency:
-                description: Metrics is a structure to hold min, max, sum, avg strings
-                  (or floats)
-                properties:
-                  avg:
-                    type: string
-                  max:
-                    type: string
-                  min:
-                    type: string
-                  sum:
-                    type: string
-                type: object
               phase:
                 type: string
+              readBandwidth:
+                description: Metrics holds min, max, sum, average for a single metric
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
               readIOPS:
-                description: Metrics is a structure to hold min, max, sum, avg strings
-                  (or floats)
+                description: We store separate read/write IOPS, latency, bandwidth
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+              readLatency:
+                description: Metrics holds min, max, sum, average for a single metric
                 properties:
                   avg:
                     type: string
@@ -125,9 +129,32 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              writeBandwidth:
+                description: Metrics holds min, max, sum, average for a single metric
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
               writeIOPS:
-                description: Metrics is a structure to hold min, max, sum, avg strings
-                  (or floats)
+                description: Metrics holds min, max, sum, average for a single metric
+                properties:
+                  avg:
+                    type: string
+                  max:
+                    type: string
+                  min:
+                    type: string
+                  sum:
+                    type: string
+                type: object
+              writeLatency:
+                description: Metrics holds min, max, sum, average for a single metric
                 properties:
                   avg:
                     type: string
@@ -213,6 +240,14 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - ""

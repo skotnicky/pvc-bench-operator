@@ -9,7 +9,7 @@ spec:
     accessMode: ReadWriteOnce
   test:
     tool: fio
-    duration: "120s"   # duration of test
+    duration: "40s"   # duration of test
     parameters:
       rw: write       # write, read, randread, randwrite, randrw, rw
       bs: 4k          # 4k, 16k, 1m
@@ -22,4 +22,4 @@ spec:
       iodepth: "1"    # number of I/O operations queued at once 
       ramp_time: "10"
   scale:
-      pvc_count: 20
+      pvc_count: 2
