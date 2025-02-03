@@ -5,8 +5,8 @@ set -euo pipefail
 # CONFIG
 ###############################################################################
 NAMESPACE="pvc-bench-operator-system"
-CHECK_INTERVAL=5
-TIMEOUT=600  # 10 minutes
+CHECK_INTERVAL=15
+TIMEOUT=3600  # 60 minutes
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 SINGLE_DIR="$SCRIPT_DIR/single"
