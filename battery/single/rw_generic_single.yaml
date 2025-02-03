@@ -1,7 +1,7 @@
 apiVersion: benchmarking.taikun.cloud/v1
 kind: PVCBenchmark
 metadata:
-  name: rw_generic_single_test
+  name: rw-generic-single-test
   namespace: pvc-bench-operator-system
 spec:
   pvc:
@@ -12,7 +12,7 @@ spec:
     duration: "60s"   # duration of test
     parameters:
       rw: rw       # write, read, randread, randwrite, randrw, rw
-      rwmixread: 70
+      rwmixread: "70"
       bs: 64k          # 4k, 16k, 1m
       size: 9Gi       # size of test file
       ioengine: libaio

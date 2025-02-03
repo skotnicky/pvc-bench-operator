@@ -1,7 +1,7 @@
 apiVersion: benchmarking.taikun.cloud/v1
 kind: PVCBenchmark
 metadata:
-  name: w_bw_single_test
+  name: w-bw-single-test
   namespace: pvc-bench-operator-system
 spec:
   pvc:

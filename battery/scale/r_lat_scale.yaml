@@ -1,7 +1,7 @@
 apiVersion: benchmarking.taikun.cloud/v1
 kind: PVCBenchmark
 metadata:
-  name: r_lat_scale_test
+  name: r-lat-scale-test
   namespace: pvc-bench-operator-system
 spec:
   pvc:

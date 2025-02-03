@@ -1,7 +1,7 @@
 apiVersion: benchmarking.taikun.cloud/v1
 kind: PVCBenchmark
 metadata:
-  name: wr_generic_scale_test
+  name: wr-generic-scale-test
   namespace: pvc-bench-operator-system
 spec:
   pvc:
