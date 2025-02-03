@@ -1,0 +1,25 @@
+apiVersion: benchmarking.taikun.cloud/v1
+kind: PVCBenchmark
+metadata:
+  name: r_bw_scale_test
+  namespace: pvc-bench-operator-system
+spec:
+  pvc:
+    size: 10Gi        # pvc size for every pod
+    accessMode: ReadWriteOnce
+  test:
+    tool: fio
+    duration: "60s"   # duration of test
+    parameters:
+      rw: randread       # write, read, randread, randwrite, randrw, rw
+      bs: 1m          # 4k, 16k, 1m
+      size: 9Gi       # size of test file
+      ioengine: libaio
+      ramp_time: "5" # warm-up before test
+      direct: "1"     # disables filesystem caching for a more direct test of the storage
+      buffered: "0"   # enables filesystem caching if you want to test the effects of cache
+      invalidate: "1" # ensures that the cache is invalidated before starting the test
+      numjobs: "8"    # how many jobs run in parallel in every pod
+      iodepth: "64"    # number of I/O operations queued at once 
+  scale:
+    pvc_count: 30
