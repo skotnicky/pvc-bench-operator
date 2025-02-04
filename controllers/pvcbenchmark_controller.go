@@ -30,7 +30,7 @@ import (
 // +kubebuilder:rbac:groups="",resources=namespaces;pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims;pods;events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;create;update;patch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch
 
 // PVCBenchmarkReconciler reconciles a PVCBenchmark object
 type PVCBenchmarkReconciler struct {
