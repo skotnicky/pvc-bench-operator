@@ -1,0 +1,130 @@
+apiVersion: benchmarking.taikun.cloud/v1
+kind: PVCBenchmark
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"benchmarking.taikun.cloud/v1","kind":"PVCBenchmark","metadata":{"annotations":{},"name":"w-lat-scale-test","namespace":"pvc-bench-operator-system"},"spec":{"pvc":{"accessMode":"ReadWriteOnce","size":"10Gi"},"scale":{"pvc_count":30},"test":{"duration":"60s","parameters":{"bs":"4k","buffered":"0","direct":"1","invalidate":"1","iodepth":"1","ioengine":"libaio","numjobs":"1","ramp_time":"5","rw":"write","size":"1Gi"},"tool":"fio"}}}
+  creationTimestamp: "2025-02-04T10:44:19Z"
+  generation: 1
+  name: w-lat-scale-test
+  namespace: pvc-bench-operator-system
+  resourceVersion: "3003033"
+  uid: 30e811a2-3b1d-41f3-b9b7-1d96628b56b4
+spec:
+  pvc:
+    accessMode: ReadWriteOnce
+    size: 10Gi
+  scale:
+    pvc_count: 30
+  test:
+    duration: 60s
+    parameters:
+      bs: 4k
+      buffered: "0"
+      direct: "1"
+      invalidate: "1"
+      iodepth: "1"
+      ioengine: libaio
+      numjobs: "1"
+      ramp_time: "5"
+      rw: write
+      size: 1Gi
+    tool: fio
+status:
+  cpuUsage:
+    avg: "24.10"
+    max: "25.05"
+    min: "23.00"
+    sum: "722.99"
+  phase: Completed
+  readBandwidth:
+    avg: "0.00"
+    max: "0.00"
+    min: "0.00"
+    sum: "0.00"
+  readIOPS:
+    avg: "0.00"
+    max: "0.00"
+    min: "0.00"
+    sum: "0.00"
+  readLatency:
+    avg: "0.00"
+    max: "0.00"
+    min: "0.00"
+    sum: "0.00"
+  results:
+    w-lat-scale-test-bench-0: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17631.84, Lat=0.06 ms, BW=68.87 MB/s, CPU Usage=24.46
+    w-lat-scale-test-bench-1: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17683.01, Lat=0.06 ms, BW=69.07 MB/s, CPU Usage=24.29
+    w-lat-scale-test-bench-2: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17529.99, Lat=0.06 ms, BW=68.48 MB/s, CPU Usage=23.26
+    w-lat-scale-test-bench-3: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16751.14, Lat=0.06 ms, BW=65.43 MB/s, CPU Usage=24.21
+    w-lat-scale-test-bench-4: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=18052.42, Lat=0.05 ms, BW=70.52 MB/s, CPU Usage=24.41
+    w-lat-scale-test-bench-5: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17565.11, Lat=0.06 ms, BW=68.61 MB/s, CPU Usage=24.39
+    w-lat-scale-test-bench-6: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=18550.46, Lat=0.05 ms, BW=72.46 MB/s, CPU Usage=24.89
+    w-lat-scale-test-bench-7: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17655.22, Lat=0.06 ms, BW=68.96 MB/s, CPU Usage=24.87
+    w-lat-scale-test-bench-8: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16341.59, Lat=0.06 ms, BW=63.83 MB/s, CPU Usage=23.08
+    w-lat-scale-test-bench-9: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16153.38, Lat=0.06 ms, BW=63.10 MB/s, CPU Usage=23.04
+    w-lat-scale-test-bench-10: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=18346.64, Lat=0.05 ms, BW=71.67 MB/s, CPU Usage=24.62
+    w-lat-scale-test-bench-11: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16440.29, Lat=0.06 ms, BW=64.22 MB/s, CPU Usage=23.98
+    w-lat-scale-test-bench-12: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=18256.53, Lat=0.05 ms, BW=71.31 MB/s, CPU Usage=24.95
+    w-lat-scale-test-bench-13: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=18468.46, Lat=0.05 ms, BW=72.14 MB/s, CPU Usage=25.04
+    w-lat-scale-test-bench-14: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17515.64, Lat=0.06 ms, BW=68.42 MB/s, CPU Usage=23.19
+    w-lat-scale-test-bench-15: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16153.43, Lat=0.06 ms, BW=63.10 MB/s, CPU Usage=23.23
+    w-lat-scale-test-bench-16: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16481.28, Lat=0.06 ms, BW=64.38 MB/s, CPU Usage=24.14
+    w-lat-scale-test-bench-17: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16615.57, Lat=0.06 ms, BW=64.90 MB/s, CPU Usage=24.29
+    w-lat-scale-test-bench-18: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16693.84, Lat=0.06 ms, BW=65.21 MB/s, CPU Usage=24.54
+    w-lat-scale-test-bench-19: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=18621.71, Lat=0.05 ms, BW=72.74 MB/s, CPU Usage=25.05
+    w-lat-scale-test-bench-20: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16750.69, Lat=0.06 ms, BW=65.43 MB/s, CPU Usage=24.36
+    w-lat-scale-test-bench-21: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17481.21, Lat=0.06 ms, BW=68.29 MB/s, CPU Usage=24.27
+    w-lat-scale-test-bench-22: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=18151.26, Lat=0.05 ms, BW=70.90 MB/s, CPU Usage=24.86
+    w-lat-scale-test-bench-23: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17603.12, Lat=0.06 ms, BW=68.76 MB/s, CPU Usage=24.69
+    w-lat-scale-test-bench-24: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17567.69, Lat=0.06 ms, BW=68.62 MB/s, CPU Usage=24.52
+    w-lat-scale-test-bench-25: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17680.41, Lat=0.06 ms, BW=69.06 MB/s, CPU Usage=23.27
+    w-lat-scale-test-bench-26: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16646.67, Lat=0.06 ms, BW=65.03 MB/s, CPU Usage=23.47
+    w-lat-scale-test-bench-27: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=17533.99, Lat=0.06 ms, BW=68.49 MB/s, CPU Usage=23.38
+    w-lat-scale-test-bench-28: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16310.26, Lat=0.06 ms, BW=63.71 MB/s, CPU Usage=23.00
+    w-lat-scale-test-bench-29: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=16374.78, Lat=0.06 ms, BW=63.96 MB/s, CPU Usage=23.22
+  writeBandwidth:
+    avg: "67.66"
+    max: "72.74"
+    min: "63.10"
+    sum: "2029.70"
+  writeIOPS:
+    avg: "17320.25"
+    max: "18621.71"
+    min: "16153.38"
+    sum: "519607.62"
+  writeLatency:
+    avg: "0.06"
+    max: "0.06"
+    min: "0.05"
+    sum: "1.71"

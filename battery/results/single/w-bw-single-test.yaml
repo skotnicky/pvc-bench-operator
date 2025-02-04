@@ -1,0 +1,72 @@
+apiVersion: benchmarking.taikun.cloud/v1
+kind: PVCBenchmark
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"benchmarking.taikun.cloud/v1","kind":"PVCBenchmark","metadata":{"annotations":{},"name":"w-bw-single-test","namespace":"pvc-bench-operator-system"},"spec":{"pvc":{"accessMode":"ReadWriteOnce","size":"10Gi"},"scale":{"pvc_count":1},"test":{"duration":"60s","parameters":{"bs":"1m","buffered":"0","direct":"1","invalidate":"1","iodepth":"64","ioengine":"libaio","numjobs":"8","ramp_time":"5","rw":"randwrite","size":"9Gi"},"tool":"fio"}}}
+  creationTimestamp: "2025-02-04T08:03:33Z"
+  generation: 1
+  name: w-bw-single-test
+  namespace: pvc-bench-operator-system
+  resourceVersion: "2912967"
+  uid: bfa4d3bf-661b-44f5-be49-7e92afef6f3b
+spec:
+  pvc:
+    accessMode: ReadWriteOnce
+    size: 10Gi
+  scale:
+    pvc_count: 1
+  test:
+    duration: 60s
+    parameters:
+      bs: 1m
+      buffered: "0"
+      direct: "1"
+      invalidate: "1"
+      iodepth: "64"
+      ioengine: libaio
+      numjobs: "8"
+      ramp_time: "5"
+      rw: randwrite
+      size: 9Gi
+    tool: fio
+status:
+  cpuUsage:
+    avg: "5.57"
+    max: "5.57"
+    min: "5.57"
+    sum: "5.57"
+  phase: Completed
+  readBandwidth:
+    avg: "0.00"
+    max: "0.00"
+    min: "0.00"
+    sum: "0.00"
+  readIOPS:
+    avg: "0.00"
+    max: "0.00"
+    min: "0.00"
+    sum: "0.00"
+  readLatency:
+    avg: "0.00"
+    max: "0.00"
+    min: "0.00"
+    sum: "0.00"
+  results:
+    w-bw-single-test-bench-0: READ => IOPS=0.00, Lat=0.00 ms, BW=0.00 MB/s; WRITE
+      => IOPS=3802.14, Lat=134.59 ms, BW=3810.52 MB/s, CPU Usage=5.57
+  writeBandwidth:
+    avg: "3810.52"
+    max: "3810.52"
+    min: "3810.52"
+    sum: "3810.52"
+  writeIOPS:
+    avg: "3802.14"
+    max: "3802.14"
+    min: "3802.14"
+    sum: "3802.14"
+  writeLatency:
+    avg: "134.59"
+    max: "134.59"
+    min: "134.59"
+    sum: "134.59"

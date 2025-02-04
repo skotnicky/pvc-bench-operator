@@ -191,7 +191,6 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
                 "app=pvc-bench-fio",
                 strconv.Itoa(benchmark.Spec.Scale.PVCCount),
 	    }
-	    readinessCheckArgs = append(readinessCheckArgs, fioArgs...)
 
             newPod := corev1.Pod{
                 ObjectMeta: metav1.ObjectMeta{
@@ -256,6 +255,18 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
                                     MountPath: "/mnt/storage",
                                 },
                             },
+                        },
+                    },
+		    InitContainers: []corev1.Container{
+                        {
+                            Name:  "wait-for-other-pods",
+                            Image: "ghcr.io/skotnicky/pvc-bench-operator/kubectl:latest",
+                            Command: []string{
+                                "/usr/local/bin/check_pods_ready.sh",
+                            },
+                            Args: readinessCheckArgs,
+                            // If needed, mount any volumes that hold config/kubeconfig
+                            // VolumeMounts: ...
                         },
                     },
                 },

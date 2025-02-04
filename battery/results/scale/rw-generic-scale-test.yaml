@@ -1,0 +1,131 @@
+apiVersion: benchmarking.taikun.cloud/v1
+kind: PVCBenchmark
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"benchmarking.taikun.cloud/v1","kind":"PVCBenchmark","metadata":{"annotations":{},"name":"rw-generic-scale-test","namespace":"pvc-bench-operator-system"},"spec":{"pvc":{"accessMode":"ReadWriteOnce","size":"10Gi"},"scale":{"pvc_count":30},"test":{"duration":"60s","parameters":{"bs":"64k","buffered":"0","direct":"1","invalidate":"1","iodepth":"16","ioengine":"libaio","numjobs":"4","ramp_time":"5","rw":"rw","rwmixread":"70","size":"9Gi"},"tool":"fio"}}}
+  creationTimestamp: "2025-02-04T10:39:13Z"
+  generation: 1
+  name: rw-generic-scale-test
+  namespace: pvc-bench-operator-system
+  resourceVersion: "2997718"
+  uid: cff98807-0310-4682-a763-df001f14310b
+spec:
+  pvc:
+    accessMode: ReadWriteOnce
+    size: 10Gi
+  scale:
+    pvc_count: 30
+  test:
+    duration: 60s
+    parameters:
+      bs: 64k
+      buffered: "0"
+      direct: "1"
+      invalidate: "1"
+      iodepth: "16"
+      ioengine: libaio
+      numjobs: "4"
+      ramp_time: "5"
+      rw: rw
+      rwmixread: "70"
+      size: 9Gi
+    tool: fio
+status:
+  cpuUsage:
+    avg: "8.10"
+    max: "9.69"
+    min: "6.62"
+    sum: "243.09"
+  phase: Completed
+  readBandwidth:
+    avg: "576.58"
+    max: "661.02"
+    min: "486.67"
+    sum: "17297.41"
+  readIOPS:
+    avg: "9224.44"
+    max: "10575.32"
+    min: "7785.74"
+    sum: "276733.06"
+  readLatency:
+    avg: "6.16"
+    max: "7.33"
+    min: "5.48"
+    sum: "184.82"
+  results:
+    rw-generic-scale-test-bench-0: READ => IOPS=7785.74, Lat=7.33 ms, BW=486.67 MB/s;
+      WRITE => IOPS=3345.15, Lat=1.46 ms, BW=209.07 MB/s, CPU Usage=7.09
+    rw-generic-scale-test-bench-1: READ => IOPS=8917.87, Lat=6.38 ms, BW=557.43 MB/s;
+      WRITE => IOPS=3825.89, Lat=1.87 ms, BW=239.12 MB/s, CPU Usage=7.95
+    rw-generic-scale-test-bench-2: READ => IOPS=8543.57, Lat=6.38 ms, BW=534.03 MB/s;
+      WRITE => IOPS=3666.82, Lat=2.35 ms, BW=229.18 MB/s, CPU Usage=7.77
+    rw-generic-scale-test-bench-3: READ => IOPS=9270.75, Lat=6.34 ms, BW=579.48 MB/s;
+      WRITE => IOPS=3977.54, Lat=1.31 ms, BW=248.60 MB/s, CPU Usage=8.35
+    rw-generic-scale-test-bench-4: READ => IOPS=9281.06, Lat=6.16 ms, BW=580.11 MB/s;
+      WRITE => IOPS=3980.09, Lat=1.73 ms, BW=248.77 MB/s, CPU Usage=8.44
+    rw-generic-scale-test-bench-5: READ => IOPS=9104.24, Lat=6.26 ms, BW=569.07 MB/s;
+      WRITE => IOPS=3909.34, Lat=1.40 ms, BW=244.33 MB/s, CPU Usage=8.15
+    rw-generic-scale-test-bench-6: READ => IOPS=10575.32, Lat=5.50 ms, BW=661.02 MB/s;
+      WRITE => IOPS=4541.87, Lat=1.27 ms, BW=283.87 MB/s, CPU Usage=8.50
+    rw-generic-scale-test-bench-7: READ => IOPS=9232.47, Lat=6.14 ms, BW=577.09 MB/s;
+      WRITE => IOPS=3965.81, Lat=1.85 ms, BW=247.86 MB/s, CPU Usage=7.51
+    rw-generic-scale-test-bench-8: READ => IOPS=8301.59, Lat=6.60 ms, BW=518.89 MB/s;
+      WRITE => IOPS=3561.33, Lat=2.43 ms, BW=222.60 MB/s, CPU Usage=7.36
+    rw-generic-scale-test-bench-9: READ => IOPS=9581.92, Lat=5.48 ms, BW=598.89 MB/s;
+      WRITE => IOPS=4114.89, Lat=2.76 ms, BW=257.22 MB/s, CPU Usage=8.10
+    rw-generic-scale-test-bench-10: READ => IOPS=10025.22, Lat=5.74 ms, BW=626.64
+      MB/s; WRITE => IOPS=4306.98, Lat=1.49 ms, BW=269.19 MB/s, CPU Usage=8.80
+    rw-generic-scale-test-bench-11: READ => IOPS=9777.49, Lat=5.79 ms, BW=611.13 MB/s;
+      WRITE => IOPS=4196.20, Lat=1.76 ms, BW=262.28 MB/s, CPU Usage=7.76
+    rw-generic-scale-test-bench-12: READ => IOPS=10323.22, Lat=5.80 ms, BW=645.25
+      MB/s; WRITE => IOPS=4438.19, Lat=1.02 ms, BW=277.40 MB/s, CPU Usage=9.34
+    rw-generic-scale-test-bench-13: READ => IOPS=9296.92, Lat=5.88 ms, BW=581.12 MB/s;
+      WRITE => IOPS=3994.07, Lat=2.43 ms, BW=249.63 MB/s, CPU Usage=7.88
+    rw-generic-scale-test-bench-14: READ => IOPS=8804.79, Lat=6.14 ms, BW=550.35 MB/s;
+      WRITE => IOPS=3778.52, Lat=2.24 ms, BW=236.16 MB/s, CPU Usage=7.82
+    rw-generic-scale-test-bench-15: READ => IOPS=9020.85, Lat=6.61 ms, BW=563.85 MB/s;
+      WRITE => IOPS=3871.69, Lat=1.23 ms, BW=242.00 MB/s, CPU Usage=7.87
+    rw-generic-scale-test-bench-16: READ => IOPS=8936.03, Lat=6.37 ms, BW=558.50 MB/s;
+      WRITE => IOPS=3834.42, Lat=1.84 ms, BW=239.71 MB/s, CPU Usage=6.90
+    rw-generic-scale-test-bench-17: READ => IOPS=9523.04, Lat=6.11 ms, BW=595.25 MB/s;
+      WRITE => IOPS=4090.30, Lat=1.41 ms, BW=255.65 MB/s, CPU Usage=8.50
+    rw-generic-scale-test-bench-18: READ => IOPS=9177.95, Lat=6.41 ms, BW=573.68 MB/s;
+      WRITE => IOPS=3941.05, Lat=1.30 ms, BW=246.32 MB/s, CPU Usage=8.18
+    rw-generic-scale-test-bench-19: READ => IOPS=9068.94, Lat=6.56 ms, BW=566.85 MB/s;
+      WRITE => IOPS=3890.20, Lat=1.05 ms, BW=243.16 MB/s, CPU Usage=7.97
+    rw-generic-scale-test-bench-20: READ => IOPS=8633.31, Lat=6.67 ms, BW=539.64 MB/s;
+      WRITE => IOPS=3703.31, Lat=1.42 ms, BW=231.46 MB/s, CPU Usage=7.95
+    rw-generic-scale-test-bench-21: READ => IOPS=9415.67, Lat=5.96 ms, BW=588.54 MB/s;
+      WRITE => IOPS=4039.83, Lat=1.95 ms, BW=252.49 MB/s, CPU Usage=9.01
+    rw-generic-scale-test-bench-22: READ => IOPS=8284.70, Lat=6.17 ms, BW=517.85 MB/s;
+      WRITE => IOPS=3555.11, Lat=3.41 ms, BW=222.19 MB/s, CPU Usage=6.81
+    rw-generic-scale-test-bench-23: READ => IOPS=9158.96, Lat=5.98 ms, BW=572.49 MB/s;
+      WRITE => IOPS=3934.60, Lat=1.52 ms, BW=245.91 MB/s, CPU Usage=8.37
+    rw-generic-scale-test-bench-24: READ => IOPS=10378.81, Lat=5.67 ms, BW=648.74
+      MB/s; WRITE => IOPS=4456.78, Lat=1.15 ms, BW=278.55 MB/s, CPU Usage=9.69
+    rw-generic-scale-test-bench-25: READ => IOPS=10043.86, Lat=5.62 ms, BW=627.80
+      MB/s; WRITE => IOPS=4312.94, Lat=1.78 ms, BW=269.56 MB/s, CPU Usage=8.95
+    rw-generic-scale-test-bench-26: READ => IOPS=7800.97, Lat=7.07 ms, BW=487.61 MB/s;
+      WRITE => IOPS=3347.51, Lat=2.55 ms, BW=209.23 MB/s, CPU Usage=6.62
+    rw-generic-scale-test-bench-27: READ => IOPS=10125.11, Lat=5.69 ms, BW=632.88
+      MB/s; WRITE => IOPS=4348.41, Lat=1.46 ms, BW=271.77 MB/s, CPU Usage=8.64
+    rw-generic-scale-test-bench-28: READ => IOPS=8976.10, Lat=6.08 ms, BW=561.07 MB/s;
+      WRITE => IOPS=3853.35, Lat=2.39 ms, BW=240.83 MB/s, CPU Usage=8.29
+    rw-generic-scale-test-bench-29: READ => IOPS=9366.58, Lat=5.91 ms, BW=585.47 MB/s;
+      WRITE => IOPS=4022.04, Lat=2.05 ms, BW=251.38 MB/s, CPU Usage=8.53
+  writeBandwidth:
+    avg: "247.52"
+    max: "283.87"
+    min: "209.07"
+    sum: "7425.49"
+  writeIOPS:
+    avg: "3960.14"
+    max: "4541.87"
+    min: "3345.15"
+    sum: "118804.21"
+  writeLatency:
+    avg: "1.80"
+    max: "3.41"
+    min: "1.02"
+    sum: "53.88"
