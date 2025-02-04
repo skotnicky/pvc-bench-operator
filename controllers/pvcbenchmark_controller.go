@@ -247,8 +247,8 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
                         {
                             Name:    "fio-benchmark",
                             Image:   "ghcr.io/skotnicky/pvc-bench-operator/fio:latest",
-			    Command: []string{"/usr/local/bin/check_pods_ready.sh"},
-                            Args: readinessCheckArgs,
+			    Command: []string{"fio"},
+                            Args: fioArgs,
                             VolumeMounts: []corev1.VolumeMount{
                                 {
                                     Name:      "pvc-volume",
