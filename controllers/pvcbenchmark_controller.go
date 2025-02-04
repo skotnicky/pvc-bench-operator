@@ -10,7 +10,7 @@ import (
     "time"
 
     "github.com/go-logr/logr"
-    pvcv1 "github.com/skotnicky/pvc-bench-operator/api/v1" // Adjust path
+    pvcv1 "github.com/skotnicky/pvc-bench-operator/api/v1"
     corev1 "k8s.io/api/core/v1"
     "k8s.io/apimachinery/pkg/api/errors"
     "k8s.io/apimachinery/pkg/api/resource"
@@ -30,6 +30,7 @@ import (
 // +kubebuilder:rbac:groups="",resources=namespaces;pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims;pods;events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;create;update;patch
 
 // PVCBenchmarkReconciler reconciles a PVCBenchmark object
 type PVCBenchmarkReconciler struct {
@@ -37,6 +38,7 @@ type PVCBenchmarkReconciler struct {
     Log logr.Logger
 }
 
+// Reconcile implements the main loop
 func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
     logger := log.FromContext(ctx)
 
@@ -44,23 +46,22 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
     var benchmark pvcv1.PVCBenchmark
     if err := r.Get(ctx, req.NamespacedName, &benchmark); err != nil {
         if errors.IsNotFound(err) {
-            // CR is gone
+            // CR is deleted
             return ctrl.Result{}, nil
         }
         return ctrl.Result{}, err
     }
 
-    // If CR is being deleted
+    // If CR is being deleted, handle finalizers if needed
     if !benchmark.ObjectMeta.DeletionTimestamp.IsZero() {
-        // handle finalizers or cleanup if needed
         return ctrl.Result{}, nil
     }
 
-    // Initialize status if empty
+    // Initialize .status.phase if empty
     if benchmark.Status.Phase == "" {
         benchmark.Status.Phase = "Pending"
         if err := r.Status().Update(ctx, &benchmark); err != nil {
-            logger.Error(err, "Failed to set phase=Pending")
+            logger.Error(err, "Failed to set initial phase=Pending")
             return ctrl.Result{}, err
         }
     }
@@ -77,7 +78,20 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
         return ctrl.Result{}, err
     }
 
-    // 4) Check if pods completed; parse logs
+    // 3.5) Check if all init containers "wait-for-other-pods" are running => set configmap if so
+    allStarted, err := r.checkAllInitContainersRunning(ctx, &benchmark)
+    if err != nil {
+        logger.Error(err, "Failed to check init container readiness")
+        return ctrl.Result{}, err
+    }
+    if allStarted {
+        if err := r.updateInitReadyConfigMap(ctx, &benchmark); err != nil {
+            logger.Error(err, "Failed to set init_ready in configmap")
+            return ctrl.Result{}, err
+        }
+    }
+
+    // 4) Check if benchmark pods completed => parse logs
     completed, results,
     readIOPS, writeIOPS,
     readLat, writeLat,
@@ -90,66 +104,124 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
     }
 
     if completed {
-        // All pods done → update status with aggregated results
+        // All pods done => update CR status
         benchmark.Status.Phase = "Completed"
         benchmark.Status.Results = results
-
         benchmark.Status.ReadIOPS = readIOPS
         benchmark.Status.WriteIOPS = writeIOPS
         benchmark.Status.ReadLatency = readLat
         benchmark.Status.WriteLatency = writeLat
         benchmark.Status.ReadBandwidth = readBW
         benchmark.Status.WriteBandwidth = writeBW
-	benchmark.Status.CPUUsage = cpu
+        benchmark.Status.CPUUsage = cpu
 
         if err := r.Status().Update(ctx, &benchmark); err != nil {
-            logger.Error(err, "Failed to update CR status=Completed")
+            logger.Error(err, "Failed to update status=Completed")
             return ctrl.Result{}, err
         }
         return ctrl.Result{}, nil
     }
 
-    // If not completed, requeue in 10s
+    // Not completed => requeue
     return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
-// ensurePVCs creates N PVCs
-func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, benchmark *pvcv1.PVCBenchmark) error {
-    pvcCount := benchmark.Spec.Scale.PVCCount
+// checkAllInitContainersRunning => if each pod has init container "wait-for-other-pods" in state.running
+func (r *PVCBenchmarkReconciler) checkAllInitContainersRunning(ctx context.Context, bench *pvcv1.PVCBenchmark) (bool, error) {
+    var podList corev1.PodList
+    if err := r.List(ctx, &podList,
+        client.InNamespace(bench.Namespace),
+        client.MatchingLabels{"app": "pvc-bench-fio"}); err != nil {
+        return false, err
+    }
+
+    if len(podList.Items) < bench.Spec.Scale.PVCCount {
+        // Not all pods created yet
+        return false, nil
+    }
+
+    startedCount := 0
+    for _, pod := range podList.Items {
+        // find init container "wait-for-other-pods"
+        for _, initStatus := range pod.Status.InitContainerStatuses {
+            if initStatus.Name == "wait-for-other-pods" {
+                if initStatus.State.Running != nil {
+                    startedCount++
+                }
+                break
+            }
+        }
+    }
+    if startedCount == bench.Spec.Scale.PVCCount {
+        return true, nil
+    }
+    return false, nil
+}
+
+// updateInitReadyConfigMap => sets key "init_ready=true" in configmap
+func (r *PVCBenchmarkReconciler) updateInitReadyConfigMap(ctx context.Context, bench *pvcv1.PVCBenchmark) error {
+    cmName := "init-ready-cm"
+    cmNs := bench.Namespace
+
+    var cm corev1.ConfigMap
+    if err := r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: cmNs}, &cm); err != nil {
+        if errors.IsNotFound(err) {
+            // create
+            newCM := corev1.ConfigMap{
+                ObjectMeta: metav1.ObjectMeta{
+                    Name: cmName,
+                    Namespace: cmNs,
+                },
+                Data: map[string]string{
+                    "init_ready": "true",
+                },
+            }
+            return r.Create(ctx, &newCM)
+        }
+        return err
+    }
+
+    // if found, just update
+    cm.Data["init_ready"] = "true"
+    return r.Update(ctx, &cm)
+}
+
+// ensurePVCs => your existing logic
+func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, bench *pvcv1.PVCBenchmark) error {
+    pvcCount := bench.Spec.Scale.PVCCount
     for i := 0; i < pvcCount; i++ {
-        pvcName := fmt.Sprintf("%s-pvc-%d", benchmark.Name, i)
+        pvcName := fmt.Sprintf("%s-pvc-%d", bench.Name, i)
 
         var pvc corev1.PersistentVolumeClaim
         err := r.Get(ctx, types.NamespacedName{
-            Namespace: benchmark.Namespace,
+            Namespace: bench.Namespace,
             Name:      pvcName,
         }, &pvc)
         if err != nil && errors.IsNotFound(err) {
-            // Create it
             newPVC := corev1.PersistentVolumeClaim{
                 ObjectMeta: metav1.ObjectMeta{
-                    Name:      pvcName,
-                    Namespace: benchmark.Namespace,
+                    Name: pvcName,
+                    Namespace: bench.Namespace,
                     Labels: map[string]string{
                         "app": "pvc-bench-fio",
                     },
                 },
                 Spec: corev1.PersistentVolumeClaimSpec{
                     AccessModes: []corev1.PersistentVolumeAccessMode{
-                        corev1.PersistentVolumeAccessMode(benchmark.Spec.PVC.AccessMode),
+                        corev1.PersistentVolumeAccessMode(bench.Spec.PVC.AccessMode),
                     },
                     Resources: corev1.VolumeResourceRequirements{
                         Requests: corev1.ResourceList{
-                            corev1.ResourceStorage: resource.MustParse(benchmark.Spec.PVC.Size),
+                            corev1.ResourceStorage: resource.MustParse(bench.Spec.PVC.Size),
                         },
                     },
                 },
             }
-            if benchmark.Spec.PVC.StorageClassName != nil {
-                newPVC.Spec.StorageClassName = benchmark.Spec.PVC.StorageClassName
+            if bench.Spec.PVC.StorageClassName != nil {
+                newPVC.Spec.StorageClassName = bench.Spec.PVC.StorageClassName
             }
-            // Set ownership
-            if err := controllerutil.SetControllerReference(benchmark, &newPVC, r.Scheme()); err != nil {
+            // set ownership
+            if err := controllerutil.SetControllerReference(bench, &newPVC, r.Scheme()); err != nil {
                 return err
             }
             if err := r.Create(ctx, &newPVC); err != nil {
@@ -162,46 +234,39 @@ func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, benchmark *pvcv
     return nil
 }
 
-// ensureBenchmarkPods creates Pods that run fio
-func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchmark *pvcv1.PVCBenchmark) error {
-    podCount := benchmark.Spec.Scale.PVCCount
+// ensureBenchmarkPods => each Pod has an initContainer that just waits for "init_ready" in configmap
+func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench *pvcv1.PVCBenchmark) error {
+    podCount := bench.Spec.Scale.PVCCount
     for i := 0; i < podCount; i++ {
-        podName := fmt.Sprintf("%s-bench-%d", benchmark.Name, i)
-        pvcName := fmt.Sprintf("%s-pvc-%d", benchmark.Name, i)
+        podName := fmt.Sprintf("%s-bench-%d", bench.Name, i)
+        pvcName := fmt.Sprintf("%s-pvc-%d", bench.Name, i)
 
         var pod corev1.Pod
-        err := r.Get(ctx, types.NamespacedName{
-            Namespace: benchmark.Namespace,
-            Name:      podName,
-        }, &pod)
+        err := r.Get(ctx, types.NamespacedName{Namespace: bench.Namespace, Name: podName}, &pod)
         if err != nil && errors.IsNotFound(err) {
-            fioArgs := buildFioArgs(benchmark.Spec.Test.Parameters)
-            if benchmark.Spec.Test.Duration != "" {
-                fioArgs = append(fioArgs, fmt.Sprintf("--runtime=%s", benchmark.Spec.Test.Duration), "--time_based")
+            // build fio args
+            fioArgs := buildFioArgs(bench.Spec.Test.Parameters)
+            if bench.Spec.Test.Duration != "" {
+                fioArgs = append(fioArgs, fmt.Sprintf("--runtime=%s", bench.Spec.Test.Duration), "--time_based")
             }
             fioArgs = append(fioArgs,
-	    	"--directory=/mnt/storage",
+                "--directory=/mnt/storage",
                 "--output-format=json",
                 "--name=benchtest",
                 "--filename=/mnt/storage/testfile",
-		"--group_reporting",
+                "--group_reporting",
             )
-	    readinessCheckArgs := []string{
-                benchmark.Namespace,
-                "app=pvc-bench-fio",
-                strconv.Itoa(benchmark.Spec.Scale.PVCCount),
-	    }
 
             newPod := corev1.Pod{
                 ObjectMeta: metav1.ObjectMeta{
                     Name:      podName,
-                    Namespace: benchmark.Namespace,
+                    Namespace: bench.Namespace,
                     Labels: map[string]string{
                         "app": "pvc-bench-fio",
                     },
                 },
                 Spec: corev1.PodSpec{
-			ServiceAccountName: "pvc-bench-operator-controller-manager",
+                    ServiceAccountName: "pvc-bench-operator-controller-manager",
                     RestartPolicy: corev1.RestartPolicyNever,
                     Volumes: []corev1.Volume{
                         {
@@ -212,43 +277,52 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
                                 },
                             },
                         },
+                        {	
+			    Name: "init-config-vol",
+        		    VolumeSource: corev1.VolumeSource{
+       			        ConfigMap: &corev1.ConfigMapVolumeSource{
+            			    LocalObjectReference: corev1.LocalObjectReference{
+               			       Name: "init-ready-cm",
+			                },
+            		    Optional: func() *bool { b := true; return &b }(),
+				  },
+			     },
+   			 },
                     },
-		    TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
-                                        {
-                                                 MaxSkew: 1,
-                                                 TopologyKey: "kubernetes.io/hostname",
-                                                 WhenUnsatisfiable: corev1.ScheduleAnyway, // <-- Allow scheduling even if constraints aren't perfectly met
-                                                 LabelSelector: &metav1.LabelSelector{
-                                                         MatchLabels: map[string]string{
-                                                          "app": "pvc-bench-fio",
-                                                         },
-                                                 },
-                                          },
-                                        },
-                                        Affinity: &corev1.Affinity{
-                                                 PodAntiAffinity: &corev1.PodAntiAffinity{
-                                                    PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-                                                         {
-                                                         Weight: 100,
-                                                         PodAffinityTerm: corev1.PodAffinityTerm{
-                                                         LabelSelector: &metav1.LabelSelector{
-                                                         MatchLabels: map[string]string{
-                                                                  "app": "pvc-bench-fio",
-                                                                        },
-                                                                 },
-                                                                 TopologyKey: "kubernetes.io/hostname",
-                                                                 },
-                                                         },
-                                                 },
-                                        },
+                    InitContainers: []corev1.Container{
+                        {
+                            Name:  "wait-for-other-pods",
+                            Image: "alpine:3.17",
+                            Command: []string{"/bin/sh"},
+                            Args: []string{
+                                "-c",
+                                `
+                                while true; do
+                                  val=$(cat /etc/initcfg/init_ready 2>/dev/null || echo "false")
+                                  if [ "$val" = "true" ]; then
+                                    echo "Operator signaled all init containers started => continuing..."
+                                    break
+                                  fi
+                                  echo "Waiting for operator to set init_ready=true in configmap..."
+                                  sleep 5
+                                done
+                                `,
+                            },
+                            VolumeMounts: []corev1.VolumeMount{
+                                {
+                                    Name:      "init-config-vol",
+                                    MountPath: "/etc/initcfg",
+                                    ReadOnly:  true,
                                 },
-
+                            },
+                        },
+                    },
                     Containers: []corev1.Container{
                         {
                             Name:    "fio-benchmark",
                             Image:   "ghcr.io/skotnicky/pvc-bench-operator/fio:latest",
-			    Command: []string{"fio"},
-                            Args: fioArgs,
+                            Command: []string{"fio"},
+                            Args:    fioArgs,
                             VolumeMounts: []corev1.VolumeMount{
                                 {
                                     Name:      "pvc-volume",
@@ -257,21 +331,40 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
                             },
                         },
                     },
-		    InitContainers: []corev1.Container{
+                    TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
                         {
-                            Name:  "wait-for-other-pods",
-                            Image: "ghcr.io/skotnicky/pvc-bench-operator/kubectl:latest",
-                            Command: []string{
-                                "/usr/local/bin/check_pods_ready.sh",
+                            MaxSkew: 1,
+                            TopologyKey: "kubernetes.io/hostname",
+                            WhenUnsatisfiable: corev1.ScheduleAnyway,
+                            LabelSelector: &metav1.LabelSelector{
+                                MatchLabels: map[string]string{
+                                    "app": "pvc-bench-fio",
+                                },
                             },
-                            Args: readinessCheckArgs,
-                            // If needed, mount any volumes that hold config/kubeconfig
-                            // VolumeMounts: ...
+                        },
+                    },
+                    Affinity: &corev1.Affinity{
+                        PodAntiAffinity: &corev1.PodAntiAffinity{
+                            PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+                                {
+                                    Weight: 100,
+                                    PodAffinityTerm: corev1.PodAffinityTerm{
+                                        LabelSelector: &metav1.LabelSelector{
+                                            MatchLabels: map[string]string{
+                                                "app": "pvc-bench-fio",
+                                            },
+                                        },
+                                        TopologyKey: "kubernetes.io/hostname",
+                                    },
+                                },
+                            },
                         },
                     },
                 },
             }
-            if err := controllerutil.SetControllerReference(benchmark, &newPod, r.Scheme()); err != nil {
+
+            // set ownership
+            if err := controllerutil.SetControllerReference(bench, &newPod, r.Scheme()); err != nil {
                 return err
             }
             if err := r.Create(ctx, &newPod); err != nil {
@@ -284,24 +377,22 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, benchm
     return nil
 }
 
-// checkAndCollectResults looks at each Pod, fetches logs, parses read+write metrics
+// checkAndCollectResults => aggregator of read/write metrics
 func (r *PVCBenchmarkReconciler) checkAndCollectResults(
     ctx context.Context,
-    benchmark *pvcv1.PVCBenchmark,
+    bench *pvcv1.PVCBenchmark,
 ) (bool,
     map[string]string,
-    pvcv1.Metrics, pvcv1.Metrics,  // readIOPS, writeIOPS
-    pvcv1.Metrics, pvcv1.Metrics,  // readLat, writeLat
-    pvcv1.Metrics, pvcv1.Metrics,  // readBW, writeBW
-    pvcv1.Metrics,		   // cpu
+    pvcv1.Metrics, pvcv1.Metrics,
+    pvcv1.Metrics, pvcv1.Metrics,
+    pvcv1.Metrics, pvcv1.Metrics,
+    pvcv1.Metrics,
     error,
 ) {
-
     results := make(map[string]string)
     completedCount := 0
-    total := benchmark.Spec.Scale.PVCCount
+    total := bench.Spec.Scale.PVCCount
 
-    // Aggregators for read/write IOPS, lat, BW
     readIopsAgg := newStatAgg()
     writeIopsAgg := newStatAgg()
 
@@ -313,14 +404,14 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
 
     cpuAgg := newStatAgg()
 
-    // Build a clientset for logs
+    // Build clientset for logs
     config, err := rest.InClusterConfig()
     if err != nil {
         return false, nil,
             pvcv1.Metrics{}, pvcv1.Metrics{},
             pvcv1.Metrics{}, pvcv1.Metrics{},
             pvcv1.Metrics{}, pvcv1.Metrics{},
-	    pvcv1.Metrics{},
+            pvcv1.Metrics{},
             err
     }
     clientset, err := kubernetes.NewForConfig(config)
@@ -329,29 +420,29 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
             pvcv1.Metrics{}, pvcv1.Metrics{},
             pvcv1.Metrics{}, pvcv1.Metrics{},
             pvcv1.Metrics{}, pvcv1.Metrics{},
-	    pvcv1.Metrics{},
+            pvcv1.Metrics{},
             err
     }
 
     for i := 0; i < total; i++ {
-        podName := fmt.Sprintf("%s-bench-%d", benchmark.Name, i)
+        podName := fmt.Sprintf("%s-bench-%d", bench.Name, i)
         var pod corev1.Pod
         if err := r.Get(ctx, types.NamespacedName{
-            Namespace: benchmark.Namespace,
+            Namespace: bench.Namespace,
             Name:      podName,
         }, &pod); err != nil {
             return false, nil,
                 pvcv1.Metrics{}, pvcv1.Metrics{},
                 pvcv1.Metrics{}, pvcv1.Metrics{},
                 pvcv1.Metrics{}, pvcv1.Metrics{},
-		pvcv1.Metrics{},
+                pvcv1.Metrics{},
                 err
         }
 
         switch pod.Status.Phase {
         case corev1.PodSucceeded, corev1.PodFailed:
             completedCount++
-            logs, logErr := getPodLogs(clientset, benchmark.Namespace, podName)
+            logs, logErr := getPodLogs(clientset, bench.Namespace, podName)
             if logErr != nil {
                 results[podName] = fmt.Sprintf("Error reading logs: %v", logErr)
                 continue
@@ -359,52 +450,45 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
             var fioData FioJSON
             parseErr := json.Unmarshal([]byte(logs), &fioData)
             if parseErr != nil {
-                // fallback to raw logs if parse fails
-                results[podName] = string(logs)
+                results[podName] = logs
                 continue
             }
 
             if len(fioData.Jobs) > 0 {
                 j := fioData.Jobs[0]
-
-                // read metrics
+                // read
                 readIopsVal := j.Read.Iops
-                readBwVal := float64(j.Read.Bw) / 1024.0           // KB/s → MB/s
-                readLatVal := j.Read.ClatNs.Mean / 1_000_000.0     // ns → ms
-
-                // write metrics
+                readBwVal := float64(j.Read.Bw) / 1024.0
+                readLatVal := j.Read.ClatNs.Mean / 1_000_000.0
+                // write
                 writeIopsVal := j.Write.Iops
                 writeBwVal := float64(j.Write.Bw) / 1024.0
                 writeLatVal := j.Write.ClatNs.Mean / 1_000_000.0
+                // CPU
+                cpuVal := j.UsrCpu + j.SysCpu
 
-                // Update aggregator
+                // aggregator
                 readIopsAgg.Add(readIopsVal)
                 writeIopsAgg.Add(writeIopsVal)
-
                 readBwAgg.Add(readBwVal)
                 writeBwAgg.Add(writeBwVal)
-
                 readLatAgg.Add(readLatVal)
                 writeLatAgg.Add(writeLatVal)
-
-		cpuVal := j.UsrCpu + j.SysCpu
                 cpuAgg.Add(cpuVal)
 
-                // Per-pod text summary
                 results[podName] = fmt.Sprintf(
-                    "READ => IOPS=%.2f, Lat=%.2f ms, BW=%.2f MB/s; WRITE => IOPS=%.2f, Lat=%.2f ms, BW=%.2f MB/s, CPU Usage=%.2f",
+                    "READ => IOPS=%.2f, Lat=%.2f ms, BW=%.2f MB/s; WRITE => IOPS=%.2f, Lat=%.2f ms, BW=%.2f MB/s; CPU=%.2f",
                     readIopsVal, readLatVal, readBwVal,
                     writeIopsVal, writeLatVal, writeBwVal,
-		    cpuVal,
+                    cpuVal,
                 )
             } else {
-                results[podName] = string(logs)
+                results[podName] = logs
             }
         }
     }
 
     if completedCount == total {
-        // Convert each aggregator to pvcv1.Metrics
         readIOPS := pvcv1.Metrics{
             Min: formatFloat(readIopsAgg.Min),
             Max: formatFloat(readIopsAgg.Max),
@@ -441,7 +525,7 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
             Sum: formatFloat(writeBwAgg.Sum),
             Avg: formatFloat(writeBwAgg.Avg()),
         }
-	cpuUsage := pvcv1.Metrics{
+        cpuUsage := pvcv1.Metrics{
             Min: formatFloat(cpuAgg.Min),
             Max: formatFloat(cpuAgg.Max),
             Sum: formatFloat(cpuAgg.Sum),
@@ -454,7 +538,7 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
         pvcv1.Metrics{}, pvcv1.Metrics{},
         pvcv1.Metrics{}, pvcv1.Metrics{},
         pvcv1.Metrics{}, pvcv1.Metrics{},
-	pvcv1.Metrics{},
+        pvcv1.Metrics{},
         nil
 }
 
@@ -467,7 +551,7 @@ func buildFioArgs(params map[string]string) []string {
     return args
 }
 
-// getPodLogs obtains container logs from "fio-benchmark"
+// getPodLogs => read logs from container "fio-benchmark"
 func getPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (string, error) {
     opts := &corev1.PodLogOptions{
         Container: "fio-benchmark",
@@ -478,6 +562,7 @@ func getPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (str
         return "", err
     }
     defer stream.Close()
+
     data, err := io.ReadAll(stream)
     if err != nil {
         return "", err
@@ -485,7 +570,6 @@ func getPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (str
     return string(data), nil
 }
 
-// SetupWithManager sets up the controller with Manager
 func (r *PVCBenchmarkReconciler) SetupWithManager(mgr ctrl.Manager) error {
     return ctrl.NewControllerManagedBy(mgr).
         For(&pvcv1.PVCBenchmark{}).
@@ -494,13 +578,14 @@ func (r *PVCBenchmarkReconciler) SetupWithManager(mgr ctrl.Manager) error {
         Complete(r)
 }
 
-// StatAgg aggregates min, max, sum, count for a float64
+// Helper aggregator
 type StatAgg struct {
-    Min float64
-    Max float64
-    Sum float64
+    Min   float64
+    Max   float64
+    Sum   float64
     Count int
 }
+
 func newStatAgg() StatAgg {
     return StatAgg{
         Min: math.MaxFloat64,
@@ -529,7 +614,7 @@ func formatFloat(val float64) string {
     return strconv.FormatFloat(val, 'f', 2, 64)
 }
 
-// FioJSON matches your FIO --output-format=json structure
+// FioJSON => parse FIO --output-format=json
 type FioJSON struct {
     Jobs []struct {
         Jobname string `json:"jobname"`
@@ -547,7 +632,7 @@ type FioJSON struct {
                 Mean float64 `json:"mean"`
             } `json:"lat_ns"`
         } `json:"write"`
-	UsrCpu float64 `json:"usr_cpu"`
+        UsrCpu float64 `json:"usr_cpu"`
         SysCpu float64 `json:"sys_cpu"`
     } `json:"jobs"`
 }

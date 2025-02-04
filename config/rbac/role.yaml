@@ -7,6 +7,16 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
   - events
   - persistentvolumeclaims
   - pods
