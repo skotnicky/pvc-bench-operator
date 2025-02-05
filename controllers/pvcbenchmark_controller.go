@@ -24,6 +24,9 @@ import (
     "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+// ----------------------------------------------------------------------
+// RBAC Annotations
+// ----------------------------------------------------------------------
 // +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/finalizers,verbs=update
@@ -38,111 +41,104 @@ type PVCBenchmarkReconciler struct {
     Log logr.Logger
 }
 
-// Reconcile implements the main loop
+// Reconcile is the main loop
 func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
     logger := log.FromContext(ctx)
 
-    // 1) Fetch PVCBenchmark
-    var benchmark pvcv1.PVCBenchmark
-    if err := r.Get(ctx, req.NamespacedName, &benchmark); err != nil {
+    // 1) Fetch the PVCBenchmark
+    var bench pvcv1.PVCBenchmark
+    if err := r.Get(ctx, req.NamespacedName, &bench); err != nil {
         if errors.IsNotFound(err) {
-            // CR is deleted
             return ctrl.Result{}, nil
         }
         return ctrl.Result{}, err
     }
 
     // If CR is being deleted, handle finalizers if needed
-    if !benchmark.ObjectMeta.DeletionTimestamp.IsZero() {
+    if !bench.ObjectMeta.DeletionTimestamp.IsZero() {
         return ctrl.Result{}, nil
     }
 
-    // Initialize .status.phase if empty
-    if benchmark.Status.Phase == "" {
-        benchmark.Status.Phase = "Pending"
-        if err := r.Status().Update(ctx, &benchmark); err != nil {
-            logger.Error(err, "Failed to set initial phase=Pending")
+    // Initialize .status.phase if missing
+    if bench.Status.Phase == "" {
+        bench.Status.Phase = "Pending"
+        if err := r.Status().Update(ctx, &bench); err != nil {
+            logger.Error(err, "Failed to set phase=Pending")
             return ctrl.Result{}, err
         }
     }
 
     // 2) Ensure PVCs
-    if err := r.ensurePVCs(ctx, &benchmark); err != nil {
+    if err := r.ensurePVCs(ctx, &bench); err != nil {
         logger.Error(err, "Failed to ensure PVCs")
         return ctrl.Result{}, err
     }
 
     // 3) Ensure Pods
-    if err := r.ensureBenchmarkPods(ctx, &benchmark); err != nil {
-        logger.Error(err, "Failed to ensure benchmark pods")
+    if err := r.ensureBenchmarkPods(ctx, &bench); err != nil {
+        logger.Error(err, "Failed to ensure pods")
         return ctrl.Result{}, err
     }
 
-    // 3.5) Check if all init containers "wait-for-other-pods" are running => set configmap if so
-    allStarted, err := r.checkAllInitContainersRunning(ctx, &benchmark)
+    // 3.5) Check if all init containers are running => set init_ready in configmap
+    allStarted, err := r.checkAllInitContainersRunning(ctx, &bench)
     if err != nil {
-        logger.Error(err, "Failed to check init container readiness")
+        logger.Error(err, "Error checking init containers")
         return ctrl.Result{}, err
     }
     if allStarted {
-        if err := r.updateInitReadyConfigMap(ctx, &benchmark); err != nil {
-            logger.Error(err, "Failed to set init_ready in configmap")
+        if err := r.updateInitReadyConfigMap(ctx, &bench); err != nil {
+            logger.Error(err, "Error setting init_ready=true in configmap")
             return ctrl.Result{}, err
         }
     }
 
-    // 4) Check if benchmark pods completed => parse logs
-    completed, results,
-    readIOPS, writeIOPS,
-    readLat, writeLat,
-    readBW, writeBW,
-    cpu,
-    err := r.checkAndCollectResults(ctx, &benchmark)
+    // 4) Check if pods done => parse logs
+    completed, results, readIOPS, writeIOPS, readLat, writeLat, readBW, writeBW, cpu, err := r.checkAndCollectResults(ctx, &bench)
     if err != nil {
         logger.Error(err, "Error collecting results")
         return ctrl.Result{}, err
     }
-
     if completed {
-        // All pods done => update CR status
-        benchmark.Status.Phase = "Completed"
-        benchmark.Status.Results = results
-        benchmark.Status.ReadIOPS = readIOPS
-        benchmark.Status.WriteIOPS = writeIOPS
-        benchmark.Status.ReadLatency = readLat
-        benchmark.Status.WriteLatency = writeLat
-        benchmark.Status.ReadBandwidth = readBW
-        benchmark.Status.WriteBandwidth = writeBW
-        benchmark.Status.CPUUsage = cpu
+        bench.Status.Phase = "Completed"
+        bench.Status.Results = results
+        bench.Status.ReadIOPS = readIOPS
+        bench.Status.WriteIOPS = writeIOPS
+        bench.Status.ReadLatency = readLat
+        bench.Status.WriteLatency = writeLat
+        bench.Status.ReadBandwidth = readBW
+        bench.Status.WriteBandwidth = writeBW
+        bench.Status.CPUUsage = cpu
 
-        if err := r.Status().Update(ctx, &benchmark); err != nil {
-            logger.Error(err, "Failed to update status=Completed")
+        if err := r.Status().Update(ctx, &bench); err != nil {
+            logger.Error(err, "Failed to set phase=Completed")
             return ctrl.Result{}, err
         }
         return ctrl.Result{}, nil
     }
 
-    // Not completed => requeue
+    // not completed => requeue
     return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
-// checkAllInitContainersRunning => if each pod has init container "wait-for-other-pods" in state.running
+// checkAllInitContainersRunning => see if each Pod has init container "wait-for-other-pods" in Running state
 func (r *PVCBenchmarkReconciler) checkAllInitContainersRunning(ctx context.Context, bench *pvcv1.PVCBenchmark) (bool, error) {
     var podList corev1.PodList
     if err := r.List(ctx, &podList,
         client.InNamespace(bench.Namespace),
-        client.MatchingLabels{"app": "pvc-bench-fio"}); err != nil {
+        client.MatchingLabels{"app": "pvc-bench-fio"},
+    ); err != nil {
         return false, err
     }
 
     if len(podList.Items) < bench.Spec.Scale.PVCCount {
-        // Not all pods created yet
+        // Pods not all created yet
         return false, nil
     }
 
     startedCount := 0
     for _, pod := range podList.Items {
-        // find init container "wait-for-other-pods"
+        // check initContainer "wait-for-other-pods"
         for _, initStatus := range pod.Status.InitContainerStatuses {
             if initStatus.Name == "wait-for-other-pods" {
                 if initStatus.State.Running != nil {
@@ -152,25 +148,26 @@ func (r *PVCBenchmarkReconciler) checkAllInitContainersRunning(ctx context.Conte
             }
         }
     }
+
     if startedCount == bench.Spec.Scale.PVCCount {
         return true, nil
     }
     return false, nil
 }
 
-// updateInitReadyConfigMap => sets key "init_ready=true" in configmap
+// updateInitReadyConfigMap => sets "init_ready"="true" in <crName>-init-cm
 func (r *PVCBenchmarkReconciler) updateInitReadyConfigMap(ctx context.Context, bench *pvcv1.PVCBenchmark) error {
-    cmName := "init-ready-cm"
-    cmNs := bench.Namespace
+    cmName := fmt.Sprintf("%s-init-cm", bench.Name)
 
     var cm corev1.ConfigMap
-    if err := r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: cmNs}, &cm); err != nil {
+    err := r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: bench.Namespace}, &cm)
+    if err != nil {
         if errors.IsNotFound(err) {
             // create
             newCM := corev1.ConfigMap{
                 ObjectMeta: metav1.ObjectMeta{
-                    Name: cmName,
-                    Namespace: cmNs,
+                    Name:      cmName,
+                    Namespace: bench.Namespace,
                 },
                 Data: map[string]string{
                     "init_ready": "true",
@@ -180,13 +177,12 @@ func (r *PVCBenchmarkReconciler) updateInitReadyConfigMap(ctx context.Context, b
         }
         return err
     }
-
-    // if found, just update
+    // if found => update
     cm.Data["init_ready"] = "true"
     return r.Update(ctx, &cm)
 }
 
-// ensurePVCs => your existing logic
+// ensurePVCs => <crName>-pvc-#
 func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, bench *pvcv1.PVCBenchmark) error {
     pvcCount := bench.Spec.Scale.PVCCount
     for i := 0; i < pvcCount; i++ {
@@ -220,7 +216,6 @@ func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, bench *pvcv1.PV
             if bench.Spec.PVC.StorageClassName != nil {
                 newPVC.Spec.StorageClassName = bench.Spec.PVC.StorageClassName
             }
-            // set ownership
             if err := controllerutil.SetControllerReference(bench, &newPVC, r.Scheme()); err != nil {
                 return err
             }
@@ -234,9 +229,11 @@ func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, bench *pvcv1.PV
     return nil
 }
 
-// ensureBenchmarkPods => each Pod has an initContainer that just waits for "init_ready" in configmap
+// ensureBenchmarkPods => <crName>-bench-#
 func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench *pvcv1.PVCBenchmark) error {
     podCount := bench.Spec.Scale.PVCCount
+    cmName := fmt.Sprintf("%s-init-cm", bench.Name) // per-CR configmap
+
     for i := 0; i < podCount; i++ {
         podName := fmt.Sprintf("%s-bench-%d", bench.Name, i)
         pvcName := fmt.Sprintf("%s-pvc-%d", bench.Name, i)
@@ -244,7 +241,6 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
         var pod corev1.Pod
         err := r.Get(ctx, types.NamespacedName{Namespace: bench.Namespace, Name: podName}, &pod)
         if err != nil && errors.IsNotFound(err) {
-            // build fio args
             fioArgs := buildFioArgs(bench.Spec.Test.Parameters)
             if bench.Spec.Test.Duration != "" {
                 fioArgs = append(fioArgs, fmt.Sprintf("--runtime=%s", bench.Spec.Test.Duration), "--time_based")
@@ -277,17 +273,17 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                                 },
                             },
                         },
-                        {	
-			    Name: "init-config-vol",
-        		    VolumeSource: corev1.VolumeSource{
-       			        ConfigMap: &corev1.ConfigMapVolumeSource{
-            			    LocalObjectReference: corev1.LocalObjectReference{
-               			       Name: "init-ready-cm",
-			                },
-            		    Optional: func() *bool { b := true; return &b }(),
-				  },
-			     },
-   			 },
+                        {
+                            Name: "init-config-vol",
+                            VolumeSource: corev1.VolumeSource{
+                                ConfigMap: &corev1.ConfigMapVolumeSource{
+                                    LocalObjectReference: corev1.LocalObjectReference{
+                                        Name: cmName, // per CR
+                                    },
+                                    Optional: func() *bool { b := true; return &b }(),
+                                },
+                            },
+                        },
                     },
                     InitContainers: []corev1.Container{
                         {
@@ -300,10 +296,10 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                                 while true; do
                                   val=$(cat /etc/initcfg/init_ready 2>/dev/null || echo "false")
                                   if [ "$val" = "true" ]; then
-                                    echo "Operator signaled all init containers started => continuing..."
+                                    echo "Operator says init_ready => proceed."
                                     break
                                   fi
-                                  echo "Waiting for operator to set init_ready=true in configmap..."
+                                  echo "Waiting for init_ready=true in configmap..."
                                   sleep 5
                                 done
                                 `,
@@ -337,9 +333,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                             TopologyKey: "kubernetes.io/hostname",
                             WhenUnsatisfiable: corev1.ScheduleAnyway,
                             LabelSelector: &metav1.LabelSelector{
-                                MatchLabels: map[string]string{
-                                    "app": "pvc-bench-fio",
-                                },
+                                MatchLabels: map[string]string{"app": "pvc-bench-fio"},
                             },
                         },
                     },
@@ -363,7 +357,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                 },
             }
 
-            // set ownership
+            // set CR ownership
             if err := controllerutil.SetControllerReference(bench, &newPod, r.Scheme()); err != nil {
                 return err
             }
@@ -377,7 +371,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
     return nil
 }
 
-// checkAndCollectResults => aggregator of read/write metrics
+// checkAndCollectResults => aggregator
 func (r *PVCBenchmarkReconciler) checkAndCollectResults(
     ctx context.Context,
     bench *pvcv1.PVCBenchmark,
@@ -395,16 +389,13 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
 
     readIopsAgg := newStatAgg()
     writeIopsAgg := newStatAgg()
-
     readLatAgg := newStatAgg()
     writeLatAgg := newStatAgg()
-
     readBwAgg := newStatAgg()
     writeBwAgg := newStatAgg()
-
     cpuAgg := newStatAgg()
 
-    // Build clientset for logs
+    // build clientset for logs
     config, err := rest.InClusterConfig()
     if err != nil {
         return false, nil,
@@ -448,12 +439,10 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
                 continue
             }
             var fioData FioJSON
-            parseErr := json.Unmarshal([]byte(logs), &fioData)
-            if parseErr != nil {
+            if err := json.Unmarshal([]byte(logs), &fioData); err != nil {
                 results[podName] = logs
                 continue
             }
-
             if len(fioData.Jobs) > 0 {
                 j := fioData.Jobs[0]
                 // read
@@ -542,7 +531,7 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
         nil
 }
 
-// buildFioArgs transforms CR's TestSpec parameters into FIO flags
+// buildFioArgs => from CR's .spec.test.parameters
 func buildFioArgs(params map[string]string) []string {
     var args []string
     for k, v := range params {
@@ -551,7 +540,7 @@ func buildFioArgs(params map[string]string) []string {
     return args
 }
 
-// getPodLogs => read logs from container "fio-benchmark"
+// getPodLogs => fetch logs from container "fio-benchmark"
 func getPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (string, error) {
     opts := &corev1.PodLogOptions{
         Container: "fio-benchmark",
@@ -578,14 +567,15 @@ func (r *PVCBenchmarkReconciler) SetupWithManager(mgr ctrl.Manager) error {
         Complete(r)
 }
 
-// Helper aggregator
+// ----------------------------------------------------------------------
+// Aggregator stuff
+// ----------------------------------------------------------------------
 type StatAgg struct {
-    Min   float64
-    Max   float64
-    Sum   float64
+    Min float64
+    Max float64
+    Sum float64
     Count int
 }
-
 func newStatAgg() StatAgg {
     return StatAgg{
         Min: math.MaxFloat64,
@@ -614,7 +604,9 @@ func formatFloat(val float64) string {
     return strconv.FormatFloat(val, 'f', 2, 64)
 }
 
-// FioJSON => parse FIO --output-format=json
+// ----------------------------------------------------------------------
+// FioJSON => parse FIO output
+// ----------------------------------------------------------------------
 type FioJSON struct {
     Jobs []struct {
         Jobname string `json:"jobname"`
