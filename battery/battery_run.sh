@@ -141,9 +141,9 @@ run_tests_in_dir() {
     fi
     found=true
 
-    # parse test_name
+    # parse test_name without quotes using sed to remove them
     local test_name
-    test_name="$(cat "$file" | yq '.metadata.name' | sed 's/\"//g')"
+    test_name="$(yq '.metadata.name' "$file" | sed 's/^"//;s/"$//')"
     if [[ -z "$test_name" ]]; then
       echo "ERROR: missing .metadata.name in $file"
       exit 1
@@ -229,7 +229,7 @@ aggregator_row() {
   local file="$2"
 
   local name
-  name="$(cat "$file" | yq '.metadata.name // ""' -)"
+  name="$(yq '.metadata.name // ""' "$file" | sed 's/^"//;s/"$//')"
 
   local readiops writeiops readbw writebw rlat wlat cpu
   readiops="$(aggregator_val 'readIOPS' "$file")"
@@ -251,10 +251,10 @@ aggregator_val() {
   local agg="$1"
   local file="$2"
   local avg minv maxv sumv
-  avg="$(cat "$file" | yq ".status.${agg}.avg // \"\"" -)"
-  minv="$(cat "$file" | yq ".status.${agg}.min // \"\"" -)"
-  maxv="$(cat "$file" | yq ".status.${agg}.max // \"\"" -)"
-  sumv="$(cat "$file" | yq ".status.${agg}.sum // \"\"" -)"
+  avg="$(yq ".status.${agg}.avg // \"\"" "$file" | sed 's/^"//;s/"$//')"
+  minv="$(yq ".status.${agg}.min // \"\"" "$file" | sed 's/^"//;s/"$//')"
+  maxv="$(yq ".status.${agg}.max // \"\"" "$file" | sed 's/^"//;s/"$//')"
+  sumv="$(yq ".status.${agg}.sum // \"\"" "$file" | sed 's/^"//;s/"$//')"
   if [[ "$avg" == "0.00" && "$minv" == "0.00" && "$maxv" == "0.00" && "$sumv" == "0.00" ]]; then
     echo ""
   else
@@ -285,21 +285,16 @@ param_row() {
   local file="$2"
 
   local name
-  name="$(cat "$file" | yq '.metadata.name // ""' -)"
+  name="$(yq '.metadata.name // ""' "$file" | sed 's/^"//;s/"$//')"
   local pvc_count
-  pvc_count="$(cat "$file" | yq '.spec.scale.pvc_count // ""' -)"
+  pvc_count="$(yq '.spec.scale.pvc_count // ""' "$file" | sed 's/^"//;s/"$//')"
   local tool
-  tool="$(cat "$file" | yq '.spec.test.tool // ""' -)"
+  tool="$(yq '.spec.test.tool // ""' "$file" | sed 's/^"//;s/"$//')"
   local duration
-  duration="$(cat "$file" | yq '.spec.test.duration // ""' -)"
+  duration="$(yq '.spec.test.duration // ""' "$file" | sed 's/^"//;s/"$//')"
   
   local param_map
-  param_map="$(cat "$file" | yq '
-    (.spec.test.parameters // {})
-    | to_entries
-    | map(.key + "=" + (.value|tostring))
-    | join(", ")
-  ' -)"
+  param_map="$(yq '(.spec.test.parameters // {}) | to_entries | map(.key + "=" + (.value|tostring)) | join(", ")' "$file" | sed 's/^"//;s/"$//')"
   merge="$duration $param_map"
   if [[ -z "$suite_col" ]]; then
     echo "| $name | $pvc_count | $tool | $merge |"
@@ -496,3 +491,4 @@ case "$SUITE" in
 esac
 
 echo "All requested suites done successfully."
+

@@ -20,7 +20,7 @@ spec:
       direct: "1"     # disables filesystem caching for a more direct test of the storage
       buffered: "0"   # enables filesystem caching if you want to test the effects of cache
       invalidate: "1" # ensures that the cache is invalidated before starting the test
-      numjobs: "3"    # how many jobs run in parallel in every pod
+      numjobs: "2"    # how many jobs run in parallel in every pod
       iodepth: "32"    # number of I/O operations queued at once 
   scale:
     pvc_count: 300

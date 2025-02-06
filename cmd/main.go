@@ -48,7 +48,7 @@ func main() {
             BindAddress: metricsAddr,
         },
         HealthProbeBindAddress: healthProbeAddr,
-        LeaderElection:         enableLeaderElection,
+        LeaderElection:         false,
         LeaderElectionID:       "9ebd4428.taikun.cloud",
     })
     if err != nil {
