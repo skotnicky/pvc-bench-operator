@@ -143,7 +143,7 @@ run_tests_in_dir() {
 
     # parse test_name
     local test_name
-    test_name="$(cat "$file" | yq '.metadata.name' |  sed 's/\"//g')"
+    test_name="$(cat "$file" | yq '.metadata.name' | sed 's/\"//g')"
     if [[ -z "$test_name" ]]; then
       echo "ERROR: missing .metadata.name in $file"
       exit 1
@@ -211,17 +211,15 @@ run_tests_in_dir() {
 print_aggregator_table() {
   local suite_col="$1"  # "" or suite name "single"
   if [[ -z "$suite_col" ]]; then
-    # single suite => 8 columns
     echo "## Aggregator Results"
     echo
-    echo "| Test Name | readIOPS | writeIOPS | readBW (MB/s) | writeBW (MB/s) | readLat (ms) | writeLat (ms) | CPUUsage |"
-    echo "|-----------|----------|-----------|---------------|----------------|--------------|---------------|----------|"
+    echo "| Test Name | readIOPS (avg/min–max [sum]) | writeIOPS (avg/min–max [sum]) | readBW (MB/s) (avg/min–max [sum]) | writeBW (MB/s) (avg/min–max [sum]) | readLat (ms) (avg/min–max [sum]) | writeLat (ms) (avg/min–max [sum]) | CPUUsage (avg/min–max [sum]) |"
+    echo "|-----------|----------------------------|-----------------------------|-------------------------------------|--------------------------------------|------------------------------------|-------------------------------------|-----------------------------|"
   else
-    # "all" mode => 9 columns with first col=Suite
     echo "## Aggregator Results"
     echo
-    echo "| Suite | Test Name | readIOPS | writeIOPS | readBW (MB/s) | writeBW (MB/s) | readLat (ms) | writeLat (ms) | CPUUsage |"
-    echo "|-------|-----------|----------|-----------|---------------|----------------|--------------|---------------|----------|"
+    echo "| Suite | Test Name | readIOPS (avg/min–max [sum]) | writeIOPS (avg/min–max [sum]) | readBW (MB/s) (avg/min–max [sum]) | writeBW (MB/s) (avg/min–max [sum]) | readLat (ms) (avg/min–max [sum]) | writeLat (ms) (avg/min–max [sum]) | CPUUsage (avg/min–max [sum]) |"
+    echo "|-------|-----------|----------------------------|-----------------------------|-------------------------------------|--------------------------------------|------------------------------------|-------------------------------------|-----------------------------|"
   fi
 }
 
@@ -233,26 +231,18 @@ aggregator_row() {
   local name
   name="$(cat "$file" | yq '.metadata.name // ""' -)"
 
-  local readiops avg minv maxv
+  local readiops writeiops readbw writebw rlat wlat cpu
   readiops="$(aggregator_val 'readIOPS' "$file")"
-  local writeiops
   writeiops="$(aggregator_val 'writeIOPS' "$file")"
-  local readbw
   readbw="$(aggregator_val 'readBandwidth' "$file")"
-  local writebw
   writebw="$(aggregator_val 'writeBandwidth' "$file")"
-  local rlat
   rlat="$(aggregator_val 'readLatency' "$file")"
-  local wlat
   wlat="$(aggregator_val 'writeLatency' "$file")"
-  local cpu
   cpu="$(aggregator_val 'cpuUsage' "$file")"
 
   if [[ -z "$suite_col" ]]; then
-    # single suite => 8 columns
     echo "| $name | $readiops | $writeiops | $readbw | $writebw | $rlat | $wlat | $cpu |"
   else
-    # all => 9 columns
     echo "| $suite_col | $name | $readiops | $writeiops | $readbw | $writebw | $rlat | $wlat | $cpu |"
   fi
 }
@@ -260,14 +250,15 @@ aggregator_row() {
 aggregator_val() {
   local agg="$1"
   local file="$2"
-  local avg minv maxv
+  local avg minv maxv sumv
   avg="$(cat "$file" | yq ".status.${agg}.avg // \"\"" -)"
   minv="$(cat "$file" | yq ".status.${agg}.min // \"\"" -)"
   maxv="$(cat "$file" | yq ".status.${agg}.max // \"\"" -)"
-  if [[ "$avg" == "0.00" && "$minv" == "0.00" && "$maxv" == "0.00" ]]; then
+  sumv="$(cat "$file" | yq ".status.${agg}.sum // \"\"" -)"
+  if [[ "$avg" == "0.00" && "$minv" == "0.00" && "$maxv" == "0.00" && "$sumv" == "0.00" ]]; then
     echo ""
   else
-    echo "$avg ($minv–$maxv)"
+    echo "$avg ($minv–$maxv) [$sumv]"
   fi
 }
 
@@ -277,16 +268,15 @@ aggregator_val() {
 print_param_table() {
   local suite_col="$1"
   if [[ -z "$suite_col" ]]; then
-    # single => 4 columns
     echo "## Parameters"
     echo
-    echo "| Test Name | tool | parameters |"
-    echo "|-----------|------|------------|"
+    echo "| Test Name | PVC Count | tool | parameters |"
+    echo "|-----------|-----------|------|------------|"
   else
     echo "## Parameters"
     echo
-    echo "| Suite | Test Name | tool | parameters |"
-    echo "|-------|-----------|------|------------|"
+    echo "| Suite | Test Name | PVC Count | tool | parameters |"
+    echo "|-------|-----------|-----------|------|------------|"
   fi
 }
 
@@ -296,12 +286,13 @@ param_row() {
 
   local name
   name="$(cat "$file" | yq '.metadata.name // ""' -)"
+  local pvc_count
+  pvc_count="$(cat "$file" | yq '.spec.scale.pvc_count // ""' -)"
   local tool
   tool="$(cat "$file" | yq '.spec.test.tool // ""' -)"
   local duration
   duration="$(cat "$file" | yq '.spec.test.duration // ""' -)"
   
-  # parse param_map
   local param_map
   param_map="$(cat "$file" | yq '
     (.spec.test.parameters // {})
@@ -311,10 +302,9 @@ param_row() {
   ' -)"
   merge="$duration $param_map"
   if [[ -z "$suite_col" ]]; then
-    # single => 3 columns
-    echo "| $name | $tool | $merge |"
+    echo "| $name | $pvc_count | $tool | $merge |"
   else
-    echo "| $suite_col | $name | $tool | $merge |"
+    echo "| $suite_col | $name | $pvc_count | $tool | $merge |"
   fi
 }
 
@@ -335,16 +325,8 @@ parse_and_generate_md() {
   echo "# Summary for $s suite" > "$summary_file"
   echo >> "$summary_file"
 
-  # aggregator table
-  # if single/scale/massive => aggregator has 8 columns, param has 4
-  # if s=all => aggregator has 9 col, param has 5 col => but we do that in the combine step
-  # We'll handle 'single' 'scale' 'massive' => no suite col
-  # We'll do aggregator + param.
-
-  # aggregator
   {
-    print_aggregator_table ""  # no suite col
-    # read each .yaml, aggregator_row
+    print_aggregator_table ""
     for f in "$d"/*.yaml; do
       [[ -e "$f" ]] || continue
       aggregator_row "" "$f"
@@ -352,7 +334,6 @@ parse_and_generate_md() {
     echo
   } >> "$summary_file"
 
-  # param
   {
     print_param_table ""
     for f in "$d"/*.yaml; do
@@ -374,12 +355,11 @@ combine_all_summaries() {
   echo "# Full Summary (all suites)" > "$fm"
   echo >> "$fm"
 
-  # aggregator
   {
     echo "## Aggregator Results"
     echo
-    echo "| Suite | Test Name | readIOPS | writeIOPS | readBW | writeBW | readLat | writeLat | CPUUsage |"
-    echo "|-------|-----------|----------|-----------|--------|---------|---------|----------|----------|"
+    echo "| Suite | Test Name | readIOPS (avg/min–max [sum]) | writeIOPS (avg/min–max [sum]) | readBW (MB/s) (avg/min–max [sum]) | writeBW (MB/s) (avg/min–max [sum]) | readLat (ms) (avg/min–max [sum]) | writeLat (ms) (avg/min–max [sum]) | CPUUsage (avg/min–max [sum]) |"
+    echo "|-------|-----------|----------------------------|-----------------------------|-------------------------------------|--------------------------------------|------------------------------------|-------------------------------------|-----------------------------|"
 
     if [[ -d "$RESULTS_DIR/single" ]]; then
       for f in "$RESULTS_DIR/single"/*.yaml; do
@@ -402,12 +382,11 @@ combine_all_summaries() {
     echo
   } >> "$fm"
 
-  # param
   {
     echo "## Parameters"
     echo
-    echo "| Suite | Test Name | tool | parameters |"
-    echo "|-------|-----------|------|------------|"
+    echo "| Suite | Test Name | PVC Count | tool | parameters |"
+    echo "|-------|-----------|-----------|------|------------|"
 
     if [[ -d "$RESULTS_DIR/single" ]]; then
       for f in "$RESULTS_DIR/single"/*.yaml; do
