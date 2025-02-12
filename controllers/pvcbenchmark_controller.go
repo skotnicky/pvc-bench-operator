@@ -74,7 +74,7 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
         return ctrl.Result{}, err
     }
 
-    // 3) Ensure Pods (with a new init container to prepare the test file)
+    // 3) Ensure Pods (with a new init container using fio --create_only)
     if err := r.ensureBenchmarkPods(ctx, &bench); err != nil {
         logger.Error(err, "Failed to ensure benchmark pods")
         return ctrl.Result{}, err
@@ -224,20 +224,22 @@ func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, bench *pvcv1.PV
 }
 
 // ensureBenchmarkPods creates Pods named "<CR-name>-bench-X"
-// Now includes an init container to prepare the test file from /dev/random.
-// The size is derived from the "size" parameter in .spec.test.parameters.
+// Now uses a fio init container with --create_only to lay out the test file.
 func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench *pvcv1.PVCBenchmark) error {
     podCount := bench.Spec.Scale.PVCCount
     cmName := fmt.Sprintf("%s-init-cm", bench.Name)
 
-    // Parse the optional "size" param from CR to determine how big the test file should be.
-    // If missing, default to 100 MiB.
-    fileSizeMiB := int64(100)
-    if sizeStr, ok := bench.Spec.Test.Parameters["size"]; ok {
-        mi, err := parseSizeToMi(sizeStr)
-        if err == nil && mi > 0 {
-            fileSizeMiB = mi
-        }
+    // Get the size string from .spec.test.parameters["size"] (e.g. "9Gi").
+    // If not present, default to "100Mi".
+    sizeStr := "100Mi"
+    if userSize, ok := bench.Spec.Test.Parameters["size"]; ok && userSize != "" {
+        sizeStr = userSize
+    }
+
+    // Possibly read numjobs from .spec.test.parameters, defaulting to 1 for init container.
+    initNumJobs := "1"
+    if nj, ok := bench.Spec.Test.Parameters["numjobs"]; ok && nj != "" {
+        initNumJobs = nj
     }
 
     for i := 0; i < podCount; i++ {
@@ -260,9 +262,19 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                     "--group_reporting",
                 )
 
-                // Prepare the init-container command
-                // We'll do "dd if=/dev/random of=/mnt/storage/testfile bs=1M count=<fileSizeMiB>"
-                initCmd := fmt.Sprintf("dd if=/dev/random of=/mnt/storage/testfile bs=1M count=%d", fileSizeMiB)
+                // Build init container args:
+                // We'll run: fio --name=initfile --filename=/mnt/storage/testfile --size=<size> --rw=write --bs=1M --create_only=1 --numjobs=<num>
+                initFioArgs := []string{
+                    "--name=initfile",
+                    "--filename=/mnt/storage/testfile",
+                    fmt.Sprintf("--size=%s", sizeStr),
+                    "--rw=write",
+                    "--bs=1M",
+                    "--create_only=1",
+                    "--direct=1",
+                    fmt.Sprintf("--numjobs=%s", initNumJobs),
+                    // Possibly add more if you need, e.g. "--ioengine=libaio"
+                }
 
                 newPod := corev1.Pod{
                     ObjectMeta: metav1.ObjectMeta{
@@ -297,9 +309,9 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                         InitContainers: []corev1.Container{
                             {
                                 Name:    "prepare-test-file",
-                                Image:   "busybox",
-                                Command: []string{"sh", "-c"},
-                                Args:    []string{initCmd},
+                                Image:   "ghcr.io/skotnicky/pvc-bench-operator/fio:latest",
+                                Command: []string{"fio"},
+                                Args:    initFioArgs,
                                 VolumeMounts: []corev1.VolumeMount{
                                     {
                                         Name:      "pvc-volume",
