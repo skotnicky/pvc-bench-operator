@@ -23,4 +23,4 @@ spec:
       numjobs: "4"    # how many jobs run in parallel in every pod
       iodepth: "16"    # number of I/O operations queued at once 
   scale:
-    pvc_count: 30
+    pvc_count: 49

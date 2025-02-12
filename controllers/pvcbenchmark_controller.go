@@ -74,16 +74,13 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
         return ctrl.Result{}, err
     }
 
-    // 3) Ensure Pods (without separate init container)
+    // 3) Ensure Pods (with a new init container to prepare the test file)
     if err := r.ensureBenchmarkPods(ctx, &bench); err != nil {
         logger.Error(err, "Failed to ensure benchmark pods")
         return ctrl.Result{}, err
     }
 
-    // 3.5) Check if all pods meet your readiness condition (e.g. main container scheduled, or your own criteria)
-    // For example, here we assume that if the pods exist (and maybe have run a simple check),
-    // the operator will update the ConfigMap to signal that fio can start.
-    // (You may choose a different condition as appropriate.)
+    // 3.5) Check if all pods meet your readiness condition
     allReady, err := r.checkAllPodsReady(ctx, &bench)
     if err != nil {
         logger.Error(err, "Error checking pods readiness")
@@ -158,7 +155,8 @@ func (r *PVCBenchmarkReconciler) checkAllPodsReady(ctx context.Context, bench *p
     return true, nil
 }
 
-// with key "init_ready" set to "true". The fio container's entrypoint script will poll this.
+// updateInitReadyConfigMap sets the key "init_ready" to "true" in the configmap.
+// The fio container's entrypoint script will poll this.
 func (r *PVCBenchmarkReconciler) updateInitReadyConfigMap(ctx context.Context, bench *pvcv1.PVCBenchmark) error {
     cmName := fmt.Sprintf("%s-init-cm", bench.Name)
     var cm corev1.ConfigMap
@@ -189,152 +187,182 @@ func (r *PVCBenchmarkReconciler) ensurePVCs(ctx context.Context, bench *pvcv1.PV
         pvcName := fmt.Sprintf("%s-pvc-%d", bench.Name, i)
         var pvc corev1.PersistentVolumeClaim
         err := r.Get(ctx, types.NamespacedName{Namespace: bench.Namespace, Name: pvcName}, &pvc)
-        if err != nil && errors.IsNotFound(err) {
-            newPVC := corev1.PersistentVolumeClaim{
-                ObjectMeta: metav1.ObjectMeta{
-                    Name:      pvcName,
-                    Namespace: bench.Namespace,
-                    Labels:    map[string]string{"app": "pvc-bench-fio"},
-                },
-                Spec: corev1.PersistentVolumeClaimSpec{
-                    AccessModes: []corev1.PersistentVolumeAccessMode{
-                        corev1.PersistentVolumeAccessMode(bench.Spec.PVC.AccessMode),
+        if err != nil {
+            if errors.IsNotFound(err) {
+                newPVC := corev1.PersistentVolumeClaim{
+                    ObjectMeta: metav1.ObjectMeta{
+                        Name:      pvcName,
+                        Namespace: bench.Namespace,
+                        Labels:    map[string]string{"app": "pvc-bench-fio"},
                     },
-                    Resources: corev1.VolumeResourceRequirements{
-                        Requests: corev1.ResourceList{
-                            corev1.ResourceStorage: resource.MustParse(bench.Spec.PVC.Size),
+                    Spec: corev1.PersistentVolumeClaimSpec{
+                        AccessModes: []corev1.PersistentVolumeAccessMode{
+                            corev1.PersistentVolumeAccessMode(bench.Spec.PVC.AccessMode),
+                        },
+                        Resources: corev1.VolumeResourceRequirements{
+                            Requests: corev1.ResourceList{
+                                corev1.ResourceStorage: resource.MustParse(bench.Spec.PVC.Size),
+                            },
                         },
                     },
-                },
-            }
-            if bench.Spec.PVC.StorageClassName != nil {
-                newPVC.Spec.StorageClassName = bench.Spec.PVC.StorageClassName
-            }
-            if err := controllerutil.SetControllerReference(bench, &newPVC, r.Scheme()); err != nil {
+                }
+                if bench.Spec.PVC.StorageClassName != nil {
+                    newPVC.Spec.StorageClassName = bench.Spec.PVC.StorageClassName
+                }
+                if err := controllerutil.SetControllerReference(bench, &newPVC, r.Scheme()); err != nil {
+                    return err
+                }
+                if err := r.Create(ctx, &newPVC); err != nil {
+                    return err
+                }
+            } else {
                 return err
             }
-            if err := r.Create(ctx, &newPVC); err != nil {
-                return err
-            }
-        } else if err != nil {
-            return err
         }
     }
     return nil
 }
 
 // ensureBenchmarkPods creates Pods named "<CR-name>-bench-X"
-// The Pods do not include a separate init container. Instead, the fio container's
-// entrypoint script (built into the image) waits for the per-CR ConfigMap signal.
+// Now includes an init container to prepare the test file from /dev/random.
+// The size is derived from the "size" parameter in .spec.test.parameters.
 func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench *pvcv1.PVCBenchmark) error {
     podCount := bench.Spec.Scale.PVCCount
     cmName := fmt.Sprintf("%s-init-cm", bench.Name)
+
+    // Parse the optional "size" param from CR to determine how big the test file should be.
+    // If missing, default to 100 MiB.
+    fileSizeMiB := int64(100)
+    if sizeStr, ok := bench.Spec.Test.Parameters["size"]; ok {
+        mi, err := parseSizeToMi(sizeStr)
+        if err == nil && mi > 0 {
+            fileSizeMiB = mi
+        }
+    }
 
     for i := 0; i < podCount; i++ {
         podName := fmt.Sprintf("%s-bench-%d", bench.Name, i)
         pvcName := fmt.Sprintf("%s-pvc-%d", bench.Name, i)
         var pod corev1.Pod
         err := r.Get(ctx, types.NamespacedName{Namespace: bench.Namespace, Name: podName}, &pod)
-        if err != nil && errors.IsNotFound(err) {
-            fioArgs := buildFioArgs(bench.Spec.Test.Parameters)
-            if bench.Spec.Test.Duration != "" {
-                fioArgs = append(fioArgs, fmt.Sprintf("--runtime=%s", bench.Spec.Test.Duration), "--time_based")
-            }
-            fioArgs = append(fioArgs,
-                "--directory=/mnt/storage",
-                "--output-format=json",
-                "--name=benchtest",
-                "--filename=/mnt/storage/testfile",
-                "--group_reporting",
-            )
+        if err != nil {
+            if errors.IsNotFound(err) {
+                // Build main container's fio args
+                fioArgs := buildFioArgs(bench.Spec.Test.Parameters)
+                if bench.Spec.Test.Duration != "" {
+                    fioArgs = append(fioArgs, fmt.Sprintf("--runtime=%s", bench.Spec.Test.Duration), "--time_based")
+                }
+                fioArgs = append(fioArgs,
+                    "--directory=/mnt/storage",
+                    "--output-format=json",
+                    "--name=benchtest",
+                    "--filename=/mnt/storage/testfile",
+                    "--group_reporting",
+                )
 
-            newPod := corev1.Pod{
-                ObjectMeta: metav1.ObjectMeta{
-                    Name:      podName,
-                    Namespace: bench.Namespace,
-                    Labels:    map[string]string{"app": "pvc-bench-fio"},
-                },
-                Spec: corev1.PodSpec{
-                    ServiceAccountName: "pvc-bench-operator-controller-manager",
-                    RestartPolicy:      corev1.RestartPolicyNever,
-                    Volumes: []corev1.Volume{
-                        {
-                            Name: "pvc-volume",
-                            VolumeSource: corev1.VolumeSource{
-                                PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-                                    ClaimName: pvcName,
-                                },
-                            },
-                        },
-                        {
-                            Name: "init-config-vol",
-                            VolumeSource: corev1.VolumeSource{
-                                ConfigMap: &corev1.ConfigMapVolumeSource{
-                                    LocalObjectReference: corev1.LocalObjectReference{
-                                        Name: cmName,
+                // Prepare the init-container command
+                // We'll do "dd if=/dev/random of=/mnt/storage/testfile bs=1M count=<fileSizeMiB>"
+                initCmd := fmt.Sprintf("dd if=/dev/random of=/mnt/storage/testfile bs=1M count=%d", fileSizeMiB)
+
+                newPod := corev1.Pod{
+                    ObjectMeta: metav1.ObjectMeta{
+                        Name:      podName,
+                        Namespace: bench.Namespace,
+                        Labels:    map[string]string{"app": "pvc-bench-fio"},
+                    },
+                    Spec: corev1.PodSpec{
+                        ServiceAccountName: "pvc-bench-operator-controller-manager",
+                        RestartPolicy:      corev1.RestartPolicyNever,
+                        Volumes: []corev1.Volume{
+                            {
+                                Name: "pvc-volume",
+                                VolumeSource: corev1.VolumeSource{
+                                    PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+                                        ClaimName: pvcName,
                                     },
-                                    Optional: func() *bool { b := true; return &b }(),
                                 },
                             },
-                        },
-                    },
-                    // No init container needed; the fio container will wait in its entrypoint.
-                    Containers: []corev1.Container{
-                        {
-                            Name:    "fio-benchmark",
-                            Image:   "ghcr.io/skotnicky/pvc-bench-operator/fio:latest",
-                            // The image's ENTRYPOINT should be updated to run an entrypoint script that waits
-                            // for the configmap signal before running fio.
-                            Command: []string{"/usr/local/bin/entrypoint.sh"},
-                            Args:    fioArgs,
-                            VolumeMounts: []corev1.VolumeMount{
-                                {
-                                    Name:      "pvc-volume",
-                                    MountPath: "/mnt/storage",
-                                },
-                                {
-                                    Name:      "init-config-vol",
-                                    MountPath: "/etc/initcfg",
-                                    ReadOnly:  true,
-                                },
-                            },
-                        },
-                    },
-                    TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
-                        {
-                            MaxSkew:           1,
-                            TopologyKey:       "kubernetes.io/hostname",
-                            WhenUnsatisfiable: corev1.ScheduleAnyway,
-                            LabelSelector: &metav1.LabelSelector{
-                                MatchLabels: map[string]string{"app": "pvc-bench-fio"},
-                            },
-                        },
-                    },
-                    Affinity: &corev1.Affinity{
-                        PodAntiAffinity: &corev1.PodAntiAffinity{
-                            PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-                                {
-                                    Weight: 100,
-                                    PodAffinityTerm: corev1.PodAffinityTerm{
-                                        LabelSelector: &metav1.LabelSelector{
-                                            MatchLabels: map[string]string{"app": "pvc-bench-fio"},
+                            {
+                                Name: "init-config-vol",
+                                VolumeSource: corev1.VolumeSource{
+                                    ConfigMap: &corev1.ConfigMapVolumeSource{
+                                        LocalObjectReference: corev1.LocalObjectReference{
+                                            Name: cmName,
                                         },
-                                        TopologyKey: "kubernetes.io/hostname",
+                                        Optional: func() *bool { b := true; return &b }(),
+                                    },
+                                },
+                            },
+                        },
+                        InitContainers: []corev1.Container{
+                            {
+                                Name:    "prepare-test-file",
+                                Image:   "busybox",
+                                Command: []string{"sh", "-c"},
+                                Args:    []string{initCmd},
+                                VolumeMounts: []corev1.VolumeMount{
+                                    {
+                                        Name:      "pvc-volume",
+                                        MountPath: "/mnt/storage",
+                                    },
+                                },
+                            },
+                        },
+                        Containers: []corev1.Container{
+                            {
+                                Name:    "fio-benchmark",
+                                Image:   "ghcr.io/skotnicky/pvc-bench-operator/fio:latest",
+                                Command: []string{"/usr/local/bin/entrypoint.sh"},
+                                Args:    fioArgs,
+                                VolumeMounts: []corev1.VolumeMount{
+                                    {
+                                        Name:      "pvc-volume",
+                                        MountPath: "/mnt/storage",
+                                    },
+                                    {
+                                        Name:      "init-config-vol",
+                                        MountPath: "/etc/initcfg",
+                                        ReadOnly:  true,
+                                    },
+                                },
+                            },
+                        },
+                        TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+                            {
+                                MaxSkew:           1,
+                                TopologyKey:       "kubernetes.io/hostname",
+                                WhenUnsatisfiable: corev1.ScheduleAnyway,
+                                LabelSelector: &metav1.LabelSelector{
+                                    MatchLabels: map[string]string{"app": "pvc-bench-fio"},
+                                },
+                            },
+                        },
+                        Affinity: &corev1.Affinity{
+                            PodAntiAffinity: &corev1.PodAntiAffinity{
+                                PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+                                    {
+                                        Weight: 100,
+                                        PodAffinityTerm: corev1.PodAffinityTerm{
+                                            LabelSelector: &metav1.LabelSelector{
+                                                MatchLabels: map[string]string{"app": "pvc-bench-fio"},
+                                            },
+                                            TopologyKey: "kubernetes.io/hostname",
+                                        },
                                     },
                                 },
                             },
                         },
                     },
-                },
-            }
-            if err := controllerutil.SetControllerReference(bench, &newPod, r.Scheme()); err != nil {
+                }
+                if err := controllerutil.SetControllerReference(bench, &newPod, r.Scheme()); err != nil {
+                    return err
+                }
+                if err := r.Create(ctx, &newPod); err != nil {
+                    return err
+                }
+            } else {
                 return err
             }
-            if err := r.Create(ctx, &newPod); err != nil {
-                return err
-            }
-        } else if err != nil {
-            return err
         }
     }
     return nil
@@ -495,6 +523,17 @@ func buildFioArgs(params map[string]string) []string {
         args = append(args, fmt.Sprintf("--%s=%s", k, v))
     }
     return args
+}
+
+// parseSizeToMi parses something like "9Gi" and returns 9216.
+func parseSizeToMi(sizeStr string) (int64, error) {
+    qty, err := resource.ParseQuantity(sizeStr)
+    if err != nil {
+        return 0, err
+    }
+    bytes := qty.Value()
+    mi := bytes / (1024 * 1024)
+    return mi, nil
 }
 
 // getPodLogs reads logs from container "fio-benchmark".
