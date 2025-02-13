@@ -250,12 +250,13 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
         if err != nil {
             if errors.IsNotFound(err) {
                 // Build main container's fio args
-                fioArgs := buildFioArgs(bench.Spec.Test.Parameters)
+                // Option A: remove "size" parameter from the final arguments
+                fioArgs := buildFioArgsSkippingSize(bench.Spec.Test.Parameters)
+
                 if bench.Spec.Test.Duration != "" {
                     fioArgs = append(fioArgs, fmt.Sprintf("--runtime=%s", bench.Spec.Test.Duration), "--time_based")
                 }
                 fioArgs = append(fioArgs,
-                    "--directory=/mnt/storage",
                     "--output-format=json",
                     "--name=benchtest",
                     "--filename=/mnt/storage/testfile",
@@ -268,7 +269,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                     "--name=initfile",
                     "--filename=/mnt/storage/testfile",
                     fmt.Sprintf("--size=%s", sizeStr),
-                    "--rw=write",
+                    "--rw=read",
                     "--bs=1M",
                     "--create_only=1",
                     "--direct=1",
@@ -532,6 +533,19 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
 func buildFioArgs(params map[string]string) []string {
     var args []string
     for k, v := range params {
+        args = append(args, fmt.Sprintf("--%s=%s", k, v))
+    }
+    return args
+}
+
+// buildFioArgsSkippingSize is an alternative that omits "size" in the main container.
+func buildFioArgsSkippingSize(params map[string]string) []string {
+    var args []string
+    for k, v := range params {
+        // skip "size" for main container
+        if k == "size" {
+            continue
+        }
         args = append(args, fmt.Sprintf("--%s=%s", k, v))
     }
     return args
