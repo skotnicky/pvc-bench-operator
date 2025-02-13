@@ -19,6 +19,89 @@ RESUME_AGE=0
 SUMMARY_ONLY=false
 
 ###############################################################################
+# HELPER: remove surrounding quotes if any.
+###############################################################################
+remove_quotes() {
+  sed 's/^"//;s/"$//'
+}
+
+###############################################################################
+# YAML PARSING HELPER FUNCTIONS
+#
+# These functions assume that the YAML files are formatted in a “regular”
+# style (each key/value pair on its own line, using spaces for indentation).
+###############################################################################
+
+# Get a value from a block.
+# Usage: get_yaml_field <file> <block> <key>
+get_yaml_field() {
+  local file="$1"
+  local block="$2"
+  local key="$3"
+  sed -n "/^${block}:/,/^[^ ]/p" "$file" \
+    | grep -E "^\s*${key}:" | head -n1 \
+    | sed -E "s/^\s*${key}:\s*//" \
+    | remove_quotes
+}
+
+# Get metadata.name
+get_metadata_name() {
+  local file="$1"
+  get_yaml_field "$file" "metadata" "name"
+}
+
+# Get a value from within the "spec.scale" block.
+# Usage: get_spec_scale_value <file> <key>
+get_spec_scale_value() {
+  local file="$1"
+  local key="$2"
+  sed -n '/^spec:/,/^[^ ]/p' "$file" \
+    | sed -n '/^  scale:/,/^[^ ]/p' \
+    | grep -E "^\s*${key}:" | head -n1 \
+    | sed -E "s/^\s*${key}:\s*//" \
+    | remove_quotes
+}
+
+# Get a value from within the "spec.test" block.
+# Usage: get_spec_test_value <file> <key>
+get_spec_test_value() {
+  local file="$1"
+  local key="$2"
+  sed -n '/^spec:/,/^[^ ]/p' "$file" \
+    | sed -n '/^  test:/,/^[^ ]/p' \
+    | grep -E "^\s*${key}:" | head -n1 \
+    | sed -E "s/^\s*${key}:\s*//" \
+    | remove_quotes
+}
+
+# Get parameters from within the "spec.test.parameters" block.
+# This will produce a comma-separated list of key=value pairs.
+get_spec_test_parameters() {
+  local file="$1"
+  sed -n '/^spec:/,/^[^ ]/p' "$file" \
+    | sed -n '/^  test:/,/^[^ ]/p' \
+    | sed -n '/parameters:/,/^[^ ]/p' \
+    | tail -n +2 \
+    | grep ':' \
+    | sed -E 's/^\s*([^:]+):\s*(.*)$/\1=\2/' \
+    | paste -sd ', ' - \
+    | sed 's/"//g'
+}
+
+# Get a value from within the "status" block for a given section.
+# Usage: get_status_value <file> <section> <key>
+get_status_value() {
+  local file="$1"
+  local section="$2"
+  local key="$3"
+  sed -n '/^status:/,/^[^ ]/p' "$file" \
+    | sed -n "/^  ${section}:/,/^[^ ]/p" \
+    | grep -E "^\s*${key}:" | head -n1 \
+    | sed -E "s/^\s*${key}:\s*//" \
+    | remove_quotes
+}
+
+###############################################################################
 # CLEANUP on ERROR
 ###############################################################################
 cleanupOnError() {
@@ -97,7 +180,7 @@ validate_all_yaml() {
       continue
     fi
     found_any=true
-    echo "Validating (dry-run=server): $file"
+    echo "Validating (server dry-run): $file"
     kubectl apply --dry-run=server -f "$file" -n "$NAMESPACE"
   done
   if [[ "$found_any" = false ]]; then
@@ -141,11 +224,10 @@ run_tests_in_dir() {
     fi
     found=true
 
-    # parse test_name without quotes using sed to remove them
     local test_name
-    test_name="$(yq '.metadata.name' "$file" | sed 's/^"//;s/"$//')"
+    test_name=$(get_metadata_name "$file")
     if [[ -z "$test_name" ]]; then
-      echo "ERROR: missing .metadata.name in $file"
+      echo "ERROR: missing metadata.name in $file"
       exit 1
     fi
 
@@ -206,10 +288,10 @@ run_tests_in_dir() {
 }
 
 ###############################################################################
-# aggregator table (8 or 9 columns if suite_col used)
+# Aggregator table functions
 ###############################################################################
 print_aggregator_table() {
-  local suite_col="$1"  # "" or suite name "single"
+  local suite_col="$1"  # "" or suite name
   if [[ -z "$suite_col" ]]; then
     echo "## Aggregator Results"
     echo
@@ -223,38 +305,14 @@ print_aggregator_table() {
   fi
 }
 
-# aggregator row for a single test
-aggregator_row() {
-  local suite_col="$1"
-  local file="$2"
-
-  local name
-  name="$(yq '.metadata.name // ""' "$file" | sed 's/^"//;s/"$//')"
-
-  local readiops writeiops readbw writebw rlat wlat cpu
-  readiops="$(aggregator_val 'readIOPS' "$file")"
-  writeiops="$(aggregator_val 'writeIOPS' "$file")"
-  readbw="$(aggregator_val 'readBandwidth' "$file")"
-  writebw="$(aggregator_val 'writeBandwidth' "$file")"
-  rlat="$(aggregator_val 'readLatency' "$file")"
-  wlat="$(aggregator_val 'writeLatency' "$file")"
-  cpu="$(aggregator_val 'cpuUsage' "$file")"
-
-  if [[ -z "$suite_col" ]]; then
-    echo "| $name | $readiops | $writeiops | $readbw | $writebw | $rlat | $wlat | $cpu |"
-  else
-    echo "| $suite_col | $name | $readiops | $writeiops | $readbw | $writebw | $rlat | $wlat | $cpu |"
-  fi
-}
-
 aggregator_val() {
   local agg="$1"
   local file="$2"
   local avg minv maxv sumv
-  avg="$(yq ".status.${agg}.avg // \"\"" "$file" | sed 's/^"//;s/"$//')"
-  minv="$(yq ".status.${agg}.min // \"\"" "$file" | sed 's/^"//;s/"$//')"
-  maxv="$(yq ".status.${agg}.max // \"\"" "$file" | sed 's/^"//;s/"$//')"
-  sumv="$(yq ".status.${agg}.sum // \"\"" "$file" | sed 's/^"//;s/"$//')"
+  avg=$(get_status_value "$file" "$agg" "avg")
+  minv=$(get_status_value "$file" "$agg" "min")
+  maxv=$(get_status_value "$file" "$agg" "max")
+  sumv=$(get_status_value "$file" "$agg" "sum")
   if [[ "$avg" == "0.00" && "$minv" == "0.00" && "$maxv" == "0.00" && "$sumv" == "0.00" ]]; then
     echo ""
   else
@@ -262,8 +320,29 @@ aggregator_val() {
   fi
 }
 
+aggregator_row() {
+  local suite_col="$1"
+  local file="$2"
+  local name
+  name=$(get_metadata_name "$file")
+  local readiops writeiops readbw writebw rlat wlat cpu
+  readiops=$(aggregator_val "readIOPS" "$file")
+  writeiops=$(aggregator_val "writeIOPS" "$file")
+  readbw=$(aggregator_val "readBandwidth" "$file")
+  writebw=$(aggregator_val "writeBandwidth" "$file")
+  rlat=$(aggregator_val "readLatency" "$file")
+  wlat=$(aggregator_val "writeLatency" "$file")
+  cpu=$(aggregator_val "cpuUsage" "$file")
+  
+  if [[ -z "$suite_col" ]]; then
+    echo "| $name | $readiops | $writeiops | $readbw | $writebw | $rlat | $wlat | $cpu |"
+  else
+    echo "| $suite_col | $name | $readiops | $writeiops | $readbw | $writebw | $rlat | $wlat | $cpu |"
+  fi
+}
+
 ###############################################################################
-# param table
+# Parameter table functions
 ###############################################################################
 print_param_table() {
   local suite_col="$1"
@@ -283,18 +362,12 @@ print_param_table() {
 param_row() {
   local suite_col="$1"
   local file="$2"
-
-  local name
-  name="$(yq '.metadata.name // ""' "$file" | sed 's/^"//;s/"$//')"
-  local pvc_count
-  pvc_count="$(yq '.spec.scale.pvc_count // ""' "$file" | sed 's/^"//;s/"$//')"
-  local tool
-  tool="$(yq '.spec.test.tool // ""' "$file" | sed 's/^"//;s/"$//')"
-  local duration
-  duration="$(yq '.spec.test.duration // ""' "$file" | sed 's/^"//;s/"$//')"
-  
-  local param_map
-  param_map="$(yq '(.spec.test.parameters // {}) | to_entries | map(.key + "=" + (.value|tostring)) | join(", ")' "$file" | sed 's/^"//;s/"$//')"
+  local name pvc_count tool duration param_map merge
+  name=$(get_metadata_name "$file")
+  pvc_count=$(get_spec_scale_value "$file" "pvc_count")
+  tool=$(get_spec_test_value "$file" "tool")
+  duration=$(get_spec_test_value "$file" "duration")
+  param_map=$(get_spec_test_parameters "$file")
   merge="$duration $param_map"
   if [[ -z "$suite_col" ]]; then
     echo "| $name | $pvc_count | $tool | $merge |"
@@ -305,17 +378,11 @@ param_row() {
 
 ###############################################################################
 # parse_and_generate_md <dir> <suiteName>
-# => aggregator table + param table
 ###############################################################################
 parse_and_generate_md() {
   local d="$1"
   local s="$2"
   local summary_file="$d/summary.md"
-
-  if ! command -v yq &>/dev/null; then
-    echo "WARNING: yq not found => no aggregator parse"
-    return
-  fi
 
   echo "# Summary for $s suite" > "$summary_file"
   echo >> "$summary_file"
@@ -343,7 +410,6 @@ parse_and_generate_md() {
 
 ###############################################################################
 # combine_all_summaries
-# => aggregator table with suite col, param table with suite col
 ###############################################################################
 combine_all_summaries() {
   local fm="$RESULTS_DIR/full_summary.md"
@@ -491,4 +557,3 @@ case "$SUITE" in
 esac
 
 echo "All requested suites done successfully."
-
