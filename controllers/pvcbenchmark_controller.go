@@ -16,8 +16,10 @@ import (
     "k8s.io/apimachinery/pkg/api/resource"
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
     "k8s.io/apimachinery/pkg/types"
+    "k8s.io/apimachinery/pkg/api/meta"
     "k8s.io/client-go/kubernetes"
     "k8s.io/client-go/rest"
+    "k8s.io/client-go/tools/record"
     ctrl "sigs.k8s.io/controller-runtime"
     "sigs.k8s.io/controller-runtime/pkg/client"
     "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -38,7 +40,8 @@ import (
 // PVCBenchmarkReconciler reconciles a PVCBenchmark object
 type PVCBenchmarkReconciler struct {
     client.Client
-    Log logr.Logger
+    Log      logr.Logger
+    Recorder record.EventRecorder
 }
 
 // Reconcile is the main reconciliation loop
@@ -62,10 +65,17 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
     // Initialize phase if not set
     if bench.Status.Phase == "" {
         bench.Status.Phase = "Pending"
+        meta.SetStatusCondition(&bench.Status.Conditions, metav1.Condition{
+            Type:    "Initialized",
+            Status:  metav1.ConditionTrue,
+            Reason:  "Initialized",
+            Message: "Benchmark initialized",
+        })
         if err := r.Status().Update(ctx, &bench); err != nil {
             logger.Error(err, "Failed to set phase=Pending")
             return ctrl.Result{}, err
         }
+        r.Recorder.Event(&bench, corev1.EventTypeNormal, "BenchmarkInitialized", "Benchmark initialized")
     }
 
     // 2) Ensure PVCs
@@ -91,6 +101,20 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
             logger.Error(err, "Error updating ConfigMap with init_ready")
             return ctrl.Result{}, err
         }
+
+        if bench.Status.Phase != "Running" {
+            bench.Status.Phase = "Running"
+            meta.SetStatusCondition(&bench.Status.Conditions, metav1.Condition{
+                Type:    "Running",
+                Status:  metav1.ConditionTrue,
+                Reason:  "Running",
+                Message: "Benchmark is running",
+            })
+            if err := r.Status().Update(ctx, &bench); err != nil {
+                return ctrl.Result{}, err
+            }
+            r.Recorder.Event(&bench, corev1.EventTypeNormal, "BenchmarkStarted", "Benchmark started")
+        }
     }
 
     // 4) Check if pods have completed and aggregate results
@@ -114,10 +138,18 @@ func (r *PVCBenchmarkReconciler) Reconcile(ctx context.Context, req ctrl.Request
         bench.Status.WriteBandwidth = writeBW
         bench.Status.CPUUsage = cpu
 
+        meta.SetStatusCondition(&bench.Status.Conditions, metav1.Condition{
+            Type:    "Completed",
+            Status:  metav1.ConditionTrue,
+            Reason:  "Completed",
+            Message: "Benchmark completed",
+        })
+
         if err := r.Status().Update(ctx, &bench); err != nil {
             logger.Error(err, "Failed to update CR status=Completed")
             return ctrl.Result{}, err
         }
+        r.Recorder.Event(&bench, corev1.EventTypeNormal, "BenchmarkCompleted", "Benchmark completed successfully")
         // Delete the per-CR ConfigMap now that the CR is completed.
         cmName := fmt.Sprintf("%s-init-cm", bench.Name)
         var cm corev1.ConfigMap
@@ -242,6 +274,11 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
         initNumJobs = nj
     }
 
+    image := "ghcr.io/skotnicky/pvc-bench-operator/fio:latest"
+    if bench.Spec.Test.Image != "" {
+        image = bench.Spec.Test.Image
+    }
+
     for i := 0; i < podCount; i++ {
         podName := fmt.Sprintf("%s-bench-%d", bench.Name, i)
         pvcName := fmt.Sprintf("%s-pvc-%d", bench.Name, i)
@@ -310,7 +347,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                         InitContainers: []corev1.Container{
                             {
                                 Name:    "prepare-test-file",
-                                Image:   "ghcr.io/skotnicky/pvc-bench-operator/fio:latest",
+                                Image:   image,
                                 Command: []string{"fio"},
                                 Args:    initFioArgs,
                                 VolumeMounts: []corev1.VolumeMount{
@@ -324,7 +361,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                         Containers: []corev1.Container{
                             {
                                 Name:    "fio-benchmark",
-                                Image:   "ghcr.io/skotnicky/pvc-bench-operator/fio:latest",
+                                Image:   image,
                                 Command: []string{"/usr/local/bin/entrypoint.sh"},
                                 Args:    fioArgs,
                                 VolumeMounts: []corev1.VolumeMount{

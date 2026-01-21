@@ -20,6 +20,8 @@ type TestSpec struct {
     Tool string `json:"tool,omitempty"`
     // e.g., "60s"
     Duration string `json:"duration,omitempty"`
+    // Optional: Custom FIO image
+    Image string `json:"image,omitempty"`
     // FIO parameters, e.g. {rw: randrw, bs: 4k, size: 1Gi}
     Parameters map[string]string `json:"parameters,omitempty"`
 }
@@ -53,9 +55,11 @@ type PVCBenchmarkStatus struct {
     WriteIOPS      Metrics `json:"writeIOPS,omitempty"`
     ReadLatency    Metrics `json:"readLatency,omitempty"`
     WriteLatency   Metrics `json:"writeLatency,omitempty"`
-    ReadBandwidth  Metrics `json:"readBandwidth,omitempty"`
+	ReadBandwidth  Metrics `json:"readBandwidth,omitempty"`
     WriteBandwidth Metrics `json:"writeBandwidth,omitempty"`
     CPUUsage	   Metrics `json:"cpuUsage,omitempty"`
+    // Conditions representing the current state of the benchmark
+    Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 //+kubebuilder:object:root=true
