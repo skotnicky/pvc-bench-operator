@@ -1,0 +1,15 @@
+apiVersion: benchmarking.taikun.cloud/v1
+kind: PVCBenchmark
+metadata:
+  name: verification-bench
+  namespace: default
+spec:
+  pvc:
+    size: 100Mi
+    accessMode: ReadWriteOnce
+  test:
+    tool: fio
+    duration: 10s
+    image: "ghcr.io/skotnicky/pvc-bench-operator/fio:latest"
+  scale:
+    pvc_count: 1

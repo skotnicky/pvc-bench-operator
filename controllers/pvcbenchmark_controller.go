@@ -321,7 +321,7 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
                         Labels:    map[string]string{"app": "pvc-bench-fio"},
                     },
                     Spec: corev1.PodSpec{
-                        ServiceAccountName: "pvc-bench-operator-controller-manager",
+
                         RestartPolicy:      corev1.RestartPolicyNever,
                         Volumes: []corev1.Volume{
                             {

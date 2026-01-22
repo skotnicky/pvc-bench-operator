@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/skotnicky/pvc-operator
-  newTag: latest
+  newTag: test-v2
