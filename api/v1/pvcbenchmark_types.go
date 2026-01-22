@@ -62,8 +62,8 @@ type PVCBenchmarkStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // PVCBenchmark is the Schema for the pvcbenchmarks API
 type PVCBenchmark struct {
@@ -74,7 +74,7 @@ type PVCBenchmark struct {
 	Status PVCBenchmarkStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // PVCBenchmarkList contains a list of PVCBenchmark
 type PVCBenchmarkList struct {

@@ -29,11 +29,13 @@ import (
 // ----------------------------------------------------------------------
 // RBAC Annotations
 // ----------------------------------------------------------------------
-// +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks,verbs=get;list;watch
+// +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks,verbs=create;update;patch;delete
 // +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=benchmarking.taikun.cloud,resources=pvcbenchmarks/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=namespaces;pods,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims;pods;events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims;pods;events,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims;pods;events,verbs=create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch
 
@@ -301,7 +303,8 @@ func (r *PVCBenchmarkReconciler) ensureBenchmarkPods(ctx context.Context, bench 
 				)
 
 				// Build init container args:
-				// We'll run: fio --name=initfile --filename=/mnt/storage/testfile --size=<size> --rw=write --bs=1M --create_only=1 --numjobs=<num>
+				// We'll run: fio --name=initfile --filename=/mnt/storage/testfile --size=<size>
+				// --rw=write --bs=1M --create_only=1 --numjobs=<num>
 				initFioArgs := []string{
 					"--name=initfile",
 					"--filename=/mnt/storage/testfile",
@@ -566,18 +569,9 @@ func (r *PVCBenchmarkReconciler) checkAndCollectResults(
 		pvcv1.Metrics{}, nil
 }
 
-// buildFioArgs transforms CR's .spec.test.parameters to FIO flags.
-func buildFioArgs(params map[string]string) []string {
-	var args []string
-	for k, v := range params {
-		args = append(args, fmt.Sprintf("--%s=%s", k, v))
-	}
-	return args
-}
-
 // buildFioArgsSkippingSize is an alternative that omits "size" in the main container.
 func buildFioArgsSkippingSize(params map[string]string) []string {
-	var args []string
+	args := make([]string, 0, len(params))
 	for k, v := range params {
 		// skip "size" for main container
 		if k == "size" {
@@ -586,17 +580,6 @@ func buildFioArgsSkippingSize(params map[string]string) []string {
 		args = append(args, fmt.Sprintf("--%s=%s", k, v))
 	}
 	return args
-}
-
-// parseSizeToMi parses something like "9Gi" and returns 9216.
-func parseSizeToMi(sizeStr string) (int64, error) {
-	qty, err := resource.ParseQuantity(sizeStr)
-	if err != nil {
-		return 0, err
-	}
-	bytes := qty.Value()
-	mi := bytes / (1024 * 1024)
-	return mi, nil
 }
 
 // getPodLogs reads logs from container "fio-benchmark".
@@ -609,7 +592,9 @@ func getPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (str
 	if err != nil {
 		return "", err
 	}
-	defer stream.Close()
+	defer func() {
+		_ = stream.Close()
+	}()
 	data, err := io.ReadAll(stream)
 	if err != nil {
 		return "", err

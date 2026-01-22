@@ -43,6 +43,8 @@ var (
 	skipCertManagerInstall bool
 	skipBuild              bool
 	skipKindLoad           bool
+
+	trueStr = "true"
 )
 
 func init() {
@@ -63,10 +65,10 @@ func TestE2E(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	// Populate variables from environment
-	skipPrometheusInstall = os.Getenv("PROMETHEUS_INSTALL_SKIP") == "true"
-	skipCertManagerInstall = os.Getenv("CERT_MANAGER_INSTALL_SKIP") == "true"
-	skipBuild = os.Getenv("E2E_SKIP_BUILD") == "true"
-	skipKindLoad = os.Getenv("E2E_SKIP_KIND_LOAD") == "true"
+	skipPrometheusInstall = os.Getenv("PROMETHEUS_INSTALL_SKIP") == trueStr
+	skipCertManagerInstall = os.Getenv("CERT_MANAGER_INSTALL_SKIP") == trueStr
+	skipBuild = os.Getenv("E2E_SKIP_BUILD") == trueStr
+	skipKindLoad = os.Getenv("E2E_SKIP_KIND_LOAD") == trueStr
 
 	By("Ensure that Prometheus is enabled")
 	_ = utils.UncommentCode("config/default/kustomization.yaml", "#- ../prometheus", "#")
