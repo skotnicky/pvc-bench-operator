@@ -67,16 +67,12 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # - PROMETHEUS_INSTALL_SKIP=true
 # - CERT_MANAGER_INSTALL_SKIP=true
 .PHONY: test-e2e
-test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
-	@command -v kind >/dev/null 2>&1 || { \
-		echo "Kind is not installed. Please install Kind manually."; \
-		exit 1; \
-	}
-	@kind get clusters | grep -q 'kind' || { \
-		echo "No Kind cluster is running. Please start a Kind cluster before running the e2e tests."; \
-		exit 1; \
-	}
+test-e2e: manifests generate fmt vet ## Run the e2e tests. (Required Kind by default, but configurable via E2E_* env vars)
 	go test ./test/e2e/ -v -ginkgo.v
+
+.PHONY: test-e2e-vcluster
+test-e2e-vcluster: manifests generate fmt vet ## Run the e2e tests in a vcluster environment (skips Kind load).
+	E2E_SKIP_BUILD=true E2E_SKIP_KIND_LOAD=true PROMETHEUS_INSTALL_SKIP=true CERT_MANAGER_INSTALL_SKIP=true E2E_IMG=${IMG} go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter

@@ -29,16 +29,6 @@ import (
 )
 
 var (
-	// Optional Environment Variables:
-	// - PROMETHEUS_INSTALL_SKIP=true: Skips Prometheus Operator installation during test setup.
-	// - CERT_MANAGER_INSTALL_SKIP=true: Skips CertManager installation during test setup.
-	// These variables are useful if Prometheus or CertManager is already installed, avoiding
-	// re-installation and conflicts.
-	skipPrometheusInstall  = os.Getenv("PROMETHEUS_INSTALL_SKIP") == "true"
-	skipCertManagerInstall = os.Getenv("CERT_MANAGER_INSTALL_SKIP") == "true"
-	skipBuild              = os.Getenv("E2E_SKIP_BUILD") == "true"
-	skipKindLoad           = os.Getenv("E2E_SKIP_KIND_LOAD") == "true"
-
 	// isPrometheusOperatorAlreadyInstalled will be set true when prometheus CRDs be found on the cluster
 	isPrometheusOperatorAlreadyInstalled = false
 	// isCertManagerAlreadyInstalled will be set true when CertManager CRDs be found on the cluster
@@ -47,6 +37,12 @@ var (
 	// projectImage is the name of the image which will be build and loaded
 	// with the code source changes to be tested.
 	projectImage = "example.com/pvc-bench-operator:v0.0.1"
+
+	// These will be populated in BeforeSuite
+	skipPrometheusInstall  bool
+	skipCertManagerInstall bool
+	skipBuild              bool
+	skipKindLoad           bool
 )
 
 func init() {
@@ -66,6 +62,12 @@ func TestE2E(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	// Populate variables from environment
+	skipPrometheusInstall = os.Getenv("PROMETHEUS_INSTALL_SKIP") == "true"
+	skipCertManagerInstall = os.Getenv("CERT_MANAGER_INSTALL_SKIP") == "true"
+	skipBuild = os.Getenv("E2E_SKIP_BUILD") == "true"
+	skipKindLoad = os.Getenv("E2E_SKIP_KIND_LOAD") == "true"
+
 	By("Ensure that Prometheus is enabled")
 	_ = utils.UncommentCode("config/default/kustomization.yaml", "#- ../prometheus", "#")
 
