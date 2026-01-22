@@ -1,0 +1,494 @@
+=== RUN   TestE2E
+  Starting pvc-bench-operator integration test suite
+Running Suite: e2e suite - /home/adamskotnicky/Projects/pvc-bench-operator/test/e2e
+===================================================================================
+Random Seed: [1m1769082996[0m
+
+Will run [1m2[0m of [1m2[0m specs
+[38;5;243m------------------------------[0m
+[0m[1m[BeforeSuite] [0m
+[38;5;243m/home/adamskotnicky/Projects/pvc-bench-operator/test/e2e/e2e_suite_test.go:68[0m
+  [1mSTEP:[0m Ensure that Prometheus is enabled [38;5;243m@ 01/22/26 12:56:36.621[0m
+[38;5;10m[BeforeSuite] PASSED [0.000 seconds][0m
+[38;5;243m------------------------------[0m
+[0mManager [38;5;243mManager [0m[1mshould run successfully[0m
+[38;5;243m/home/adamskotnicky/Projects/pvc-bench-operator/test/e2e/e2e_test.go:141[0m
+  [1mSTEP:[0m creating manager namespace [38;5;243m@ 01/22/26 12:56:36.621[0m
+  running: kubectl create ns pvc-bench-operator-system
+  [1mSTEP:[0m labeling the namespace to enforce the restricted security policy [38;5;243m@ 01/22/26 12:56:36.725[0m
+  running: kubectl label --overwrite ns pvc-bench-operator-system pod-security.kubernetes.io/enforce=restricted
+  [1mSTEP:[0m installing CRDs [38;5;243m@ 01/22/26 12:56:36.848[0m
+  running: make install
+  [1mSTEP:[0m deploying the controller-manager [38;5;243m@ 01/22/26 12:56:37.344[0m
+  running: make deploy IMG=ghcr.io/skotnicky/pvc-operator:test-v2
+  [1mSTEP:[0m validating that the controller-manager pod is running as expected [38;5;243m@ 01/22/26 12:56:38.416[0m
+  running: kubectl get pods -l control-plane=controller-manager -o go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ "\n" }}{{ end }}{{ end }} -n pvc-bench-operator-system
+  running: kubectl get pods pvc-bench-operator-controller-manager-776cc8ff65-5vk2m -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods -l control-plane=controller-manager -o go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ "\n" }}{{ end }}{{ end }} -n pvc-bench-operator-system
+  running: kubectl get pods pvc-bench-operator-controller-manager-776cc8ff65-5vk2m -o jsonpath={.status.phase} -n pvc-bench-operator-system
+[38;5;10m• [3.209 seconds][0m
+[38;5;243m------------------------------[0m
+[0mManager [38;5;243mManager [0m[1mshould ensure the metrics endpoint is serving metrics[0m
+[38;5;243m/home/adamskotnicky/Projects/pvc-bench-operator/test/e2e/e2e_test.go:173[0m
+  [1mSTEP:[0m creating a ClusterRoleBinding for the service account to allow access to metrics [38;5;243m@ 01/22/26 12:56:39.83[0m
+  running: kubectl create clusterrolebinding pvc-bench-operator-metrics-binding --clusterrole=pvc-bench-operator-metrics-reader --serviceaccount=pvc-bench-operator-system:pvc-bench-operator-controller-manager
+  [1mSTEP:[0m validating that the metrics service is available [38;5;243m@ 01/22/26 12:56:39.936[0m
+  running: kubectl get service pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  [1mSTEP:[0m getting the service account token [38;5;243m@ 01/22/26 12:56:40.043[0m
+  [1mSTEP:[0m waiting for the metrics endpoint to be ready [38;5;243m@ 01/22/26 12:56:40.151[0m
+  running: kubectl get endpoints pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  running: kubectl get endpoints pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  running: kubectl get endpoints pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  running: kubectl get endpoints pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  running: kubectl get endpoints pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  running: kubectl get endpoints pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  running: kubectl get endpoints pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  running: kubectl get endpoints pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  running: kubectl get endpoints pvc-bench-operator-controller-manager-metrics-service -n pvc-bench-operator-system
+  [1mSTEP:[0m verifying that the controller manager is serving the metrics server [38;5;243m@ 01/22/26 12:56:49.158[0m
+  running: kubectl logs pvc-bench-operator-controller-manager-776cc8ff65-5vk2m -n pvc-bench-operator-system
+  [1mSTEP:[0m creating the curl-metrics pod to access the metrics endpoint [38;5;243m@ 01/22/26 12:56:49.402[0m
+  running: kubectl run curl-metrics --restart=Never --namespace pvc-bench-operator-system --image=curlimages/curl:latest --overrides {
+  					"spec": {
+  						"containers": [{
+  							"name": "curl",
+  							"image": "curlimages/curl:latest",
+  							"command": ["/bin/sh", "-c"],
+  							"args": ["curl -v -k -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Im1lemhqOTdrVmE1Q1lPbUFzNEZWZlhPR0t6ZHhkUW1hYWpFNGRUMjhISUUifQ.eyJhdWQiOlsiaHR0cHM6Ly9rdWJlcm5ldGVzLmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWwiXSwiZXhwIjoxNzY5MDg2NjAwLCJpYXQiOjE3NjkwODMwMDAsImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwianRpIjoiNzhmODdlMDAtYzUyNi00MDEzLWJlYmMtMWRhY2EwZWYzZDExIiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJwdmMtYmVuY2gtb3BlcmF0b3Itc3lzdGVtIiwic2VydmljZWFjY291bnQiOnsibmFtZSI6InB2Yy1iZW5jaC1vcGVyYXRvci1jb250cm9sbGVyLW1hbmFnZXIiLCJ1aWQiOiIzNjVjNmEyMC1lYzI0LTQ3YmQtODBiNC00MGRkM2ZjNzhmZjIifX0sIm5iZiI6MTc2OTA4MzAwMCwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OnB2Yy1iZW5jaC1vcGVyYXRvci1zeXN0ZW06cHZjLWJlbmNoLW9wZXJhdG9yLWNvbnRyb2xsZXItbWFuYWdlciJ9.BqRHSaEujJxDXKtZ4_7H4IbGXllwz3mJvC14gryuftMfuXDANH4I8lFyaTgItm-X_3T-K5M-LkYNLWJnhfaEyBIjbECUPbrwoe4vMTcv87ybetCVZgJ4QmIegm0063o1LNoqOx9U3FhgrzmZhsSk8kmgBBiftU0iwLnYZecyzLKzjDX_2oRTeFa0nkuIB1rgUflki1VP_awmqBzwrljNBUj0dq-Nth-NkZktjjJG_XZd_Xx74lGs6pU3Tfwpnh7jYsOJKCm44IjCF9AGN6gaXHLh8FZXlI2Nhw_z_zDSKUq7TGBKW-IS1Mc1JFVvIjoCPoJ0ZbtEPItjUXE-LUnPKA' https://pvc-bench-operator-controller-manager-metrics-service.pvc-bench-operator-system.svc.cluster.local:8443/metrics"],
+  							"securityContext": {
+  								"allowPrivilegeEscalation": false,
+  								"capabilities": {
+  									"drop": ["ALL"]
+  								},
+  								"runAsNonRoot": true,
+  								"runAsUser": 1000,
+  								"seccompProfile": {
+  									"type": "RuntimeDefault"
+  								}
+  							}
+  						}],
+  						"serviceAccount": "pvc-bench-operator-controller-manager"
+  					}
+  				}
+  [1mSTEP:[0m waiting for the curl-metrics pod to complete. [38;5;243m@ 01/22/26 12:56:49.517[0m
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  running: kubectl get pods curl-metrics -o jsonpath={.status.phase} -n pvc-bench-operator-system
+  [38;5;9m[FAILED][0m in [It] - /home/adamskotnicky/Projects/pvc-bench-operator/test/e2e/e2e_test.go:257 [38;5;243m@ 01/22/26 13:01:49.518[0m
+  [1mSTEP:[0m Fetching controller manager pod logs [38;5;243m@ 01/22/26 13:01:49.519[0m
+  running: kubectl logs pvc-bench-operator-controller-manager-776cc8ff65-5vk2m -n pvc-bench-operator-system
+  Controller logs:
+   2026-01-22T11:56:39Z	INFO	setup	starting manager
+  2026-01-22T11:56:39Z	INFO	controller-runtime.metrics	Starting metrics server
+  2026-01-22T11:56:39Z	INFO	starting server	{"name": "health probe", "addr": "[::]:8081"}
+  2026-01-22T11:56:39Z	INFO	controller-runtime.metrics	Serving metrics server	{"bindAddress": ":8443", "secure": false}
+  2026-01-22T11:56:39Z	INFO	Starting EventSource	{"controller": "pvcbenchmark", "controllerGroup": "benchmarking.taikun.cloud", "controllerKind": "PVCBenchmark", "source": "kind source: *v1.PVCBenchmark"}
+  2026-01-22T11:56:39Z	INFO	Starting EventSource	{"controller": "pvcbenchmark", "controllerGroup": "benchmarking.taikun.cloud", "controllerKind": "PVCBenchmark", "source": "kind source: *v1.Pod"}
+  2026-01-22T11:56:39Z	INFO	Starting EventSource	{"controller": "pvcbenchmark", "controllerGroup": "benchmarking.taikun.cloud", "controllerKind": "PVCBenchmark", "source": "kind source: *v1.PersistentVolumeClaim"}
+  2026-01-22T11:56:39Z	INFO	Starting Controller	{"controller": "pvcbenchmark", "controllerGroup": "benchmarking.taikun.cloud", "controllerKind": "PVCBenchmark"}
+  2026-01-22T11:56:39Z	INFO	Starting workers	{"controller": "pvcbenchmark", "controllerGroup": "benchmarking.taikun.cloud", "controllerKind": "PVCBenchmark", "worker count": 1}
+  [1mSTEP:[0m Fetching Kubernetes events [38;5;243m@ 01/22/26 13:01:49.652[0m
+  running: kubectl get events -n pvc-bench-operator-system --sort-by=.lastTimestamp
+  Kubernetes events:
+  LAST SEEN   TYPE     REASON              OBJECT                                                        MESSAGE
+  5m          Normal   Scheduled           pod/curl-metrics                                              Successfully assigned pvc-bench-operator-system/curl-metrics to prod-294-2189-bigger-3
+  5m11s       Normal   Scheduled           pod/pvc-bench-operator-controller-manager-776cc8ff65-5vk2m    Successfully assigned pvc-bench-operator-system/pvc-bench-operator-controller-manager-776cc8ff65-5vk2m to prod-294-2189-bigger-1
+  5m11s       Normal   SuccessfulCreate    replicaset/pvc-bench-operator-controller-manager-776cc8ff65   Created pod: pvc-bench-operator-controller-manager-776cc8ff65-5vk2m
+  5m11s       Normal   ScalingReplicaSet   deployment/pvc-bench-operator-controller-manager              Scaled up replica set pvc-bench-operator-controller-manager-776cc8ff65 to 1
+  5m10s       Normal   Pulled              pod/pvc-bench-operator-controller-manager-776cc8ff65-5vk2m    Container image "ghcr.io/skotnicky/pvc-operator:test-v2" already present on machine
+  5m10s       Normal   Created             pod/pvc-bench-operator-controller-manager-776cc8ff65-5vk2m    Created container manager
+  5m10s       Normal   Started             pod/pvc-bench-operator-controller-manager-776cc8ff65-5vk2m    Started container manager
+  4m59s       Normal   Pulling             pod/curl-metrics                                              Pulling image "curlimages/curl:latest"
+  4m59s       Normal   Pulled              pod/curl-metrics                                              Successfully pulled image "curlimages/curl:latest" in 453ms (453ms including waiting). Image size: 10767170 bytes.
+  4m59s       Normal   Created             pod/curl-metrics                                              Created container curl
+  4m59s       Normal   Started             pod/curl-metrics                                              Started container curl
+  [1mSTEP:[0m Fetching curl-metrics logs [38;5;243m@ 01/22/26 13:01:49.776[0m
+  running: kubectl logs curl-metrics -n pvc-bench-operator-system
+  Metrics logs:
+     % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                   Dload  Upload  Total   Spent   Left   Speed
+    0      0   0      0   0      0      0      0                              0* Host pvc-bench-operator-controller-manager-metrics-service.pvc-bench-operator-system.svc.cluster.local:8443 was resolved.
+  * IPv6: (none)
+  * IPv4: 10.233.45.135
+  *   Trying 10.233.45.135:8443...
+  * ALPN: curl offers h2,http/1.1
+  } [5 bytes data]
+  * TLSv1.3 (OUT), TLS handshake, Client hello (1):
+  } [1643 bytes data]
+  * SSL Trust: peer verification disabled
+  { [5 bytes data]
+  * TLS connect error: error:0A00010B:SSL routines::wrong version number
+
+  * closing connection #0
+  curl: (35) TLS connect error: error:0A00010B:SSL routines::wrong version number
+  [1mSTEP:[0m Fetching controller manager pod description [38;5;243m@ 01/22/26 13:01:49.92[0m
+  running: kubectl describe pod pvc-bench-operator-controller-manager-776cc8ff65-5vk2m -n pvc-bench-operator-system
+Pod description:
+ Name:             pvc-bench-operator-controller-manager-776cc8ff65-5vk2m
+Namespace:        pvc-bench-operator-system
+Priority:         0
+Service Account:  pvc-bench-operator-controller-manager
+Node:             prod-294-2189-bigger-1/192.168.101.244
+Start Time:       Thu, 22 Jan 2026 12:56:38 +0100
+Labels:           app.kubernetes.io/name=pvc-bench-operator
+                  control-plane=controller-manager
+                  pod-template-hash=776cc8ff65
+Annotations:      kubectl.kubernetes.io/default-container: manager
+Status:           Running
+SeccompProfile:   RuntimeDefault
+IP:               10.233.81.37
+IPs:
+  IP:           10.233.81.37
+Controlled By:  ReplicaSet/pvc-bench-operator-controller-manager-776cc8ff65
+Containers:
+  manager:
+    Container ID:  containerd://d2a6697788d742b1831c742f038b1ce39af8fc6fa27532d18552e509e3dc0535
+    Image:         ghcr.io/skotnicky/pvc-operator:test-v2
+    Image ID:      ghcr.io/skotnicky/pvc-operator@sha256:d190440537b9be01f2dcf14431e497dd506ddd9667c1522510a4ac0ac37d48c8
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /manager
+    Args:
+      --metrics-bind-address=:8443
+      --leader-elect
+      --health-probe-bind-address=:8081
+    State:          Running
+      Started:      Thu, 22 Jan 2026 12:56:39 +0100
+    Ready:          True
+    Restart Count:  0
+    Requests:
+      cpu:        900m
+      memory:     1Gi
+    Liveness:     http-get http://:8081/healthz delay=15s timeout=1s period=20s #success=1 #failure=3
+    Readiness:    http-get http://:8081/readyz delay=5s timeout=1s period=10s #success=1 #failure=3
+    Environment:  <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-bdv78 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-bdv78:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age    From               Message
+  ----    ------     ----   ----               -------
+  Normal  Scheduled  5m11s  default-scheduler  Successfully assigned pvc-bench-operator-system/pvc-bench-operator-controller-manager-776cc8ff65-5vk2m to prod-294-2189-bigger-1
+  Normal  Pulled     5m11s  kubelet            Container image "ghcr.io/skotnicky/pvc-operator:test-v2" already present on machine
+  Normal  Created    5m11s  kubelet            Created container manager
+  Normal  Started    5m11s  kubelet            Started container manager
+
+  [1mSTEP:[0m cleaning up the curl pod for metrics [38;5;243m@ 01/22/26 13:01:50.051[0m
+  running: kubectl delete pod curl-metrics -n pvc-bench-operator-system
+  [1mSTEP:[0m undeploying the controller-manager [38;5;243m@ 01/22/26 13:01:50.228[0m
+  running: make undeploy
+  [1mSTEP:[0m uninstalling CRDs [38;5;243m@ 01/22/26 13:01:56.626[0m
+  running: make uninstall
+  [1mSTEP:[0m removing manager namespace [38;5;243m@ 01/22/26 13:01:57.056[0m
+  running: kubectl delete ns pvc-bench-operator-system
+[38;5;9m• [FAILED] [317.329 seconds][0m
+[0mManager [38;5;243mManager [38;5;9m[1m[It] should ensure the metrics endpoint is serving metrics[0m
+[38;5;243m/home/adamskotnicky/Projects/pvc-bench-operator/test/e2e/e2e_test.go:173[0m
+
+  [38;5;9m[FAILED] Timed out after 300.001s.
+  The function passed to Eventually failed at /home/adamskotnicky/Projects/pvc-bench-operator/test/e2e/e2e_test.go:255 with:
+  curl pod in wrong status
+  Expected
+      <string>: Failed
+  to equal
+      <string>: Succeeded[0m
+  [38;5;9mIn [1m[It][0m[38;5;9m at: [1m/home/adamskotnicky/Projects/pvc-bench-operator/test/e2e/e2e_test.go:257[0m [38;5;243m@ 01/22/26 13:01:49.518[0m
+[38;5;243m------------------------------[0m
+[0m[1m[AfterSuite] [0m
+[38;5;243m/home/adamskotnicky/Projects/pvc-bench-operator/test/e2e/e2e_suite_test.go:113[0m
+[38;5;10m[AfterSuite] PASSED [0.000 seconds][0m
+[38;5;243m------------------------------[0m
+
+[38;5;9m[1mSummarizing 1 Failure:[0m
+  [38;5;9m[FAIL][0m [0mManager [38;5;243mManager [38;5;9m[1m[It] should ensure the metrics endpoint is serving metrics[0m
+  [38;5;243m/home/adamskotnicky/Projects/pvc-bench-operator/test/e2e/e2e_test.go:257[0m
+
+[38;5;9m[1mRan 2 of 2 Specs in 320.538 seconds[0m
+[38;5;9m[1mFAIL![0m -- [38;5;10m[1m1 Passed[0m | [38;5;9m[1m1 Failed[0m | [38;5;11m[1m0 Pending[0m | [38;5;14m[1m0 Skipped[0m
+--- FAIL: TestE2E (320.54s)
+FAIL
+FAIL	github.com/skotnicky/pvc-bench-operator/test/e2e	320.542s
+FAIL

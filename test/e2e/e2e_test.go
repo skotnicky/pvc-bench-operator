@@ -184,10 +184,12 @@ var _ = Describe("Manager", Ordered, func() {
 			_, err = utils.Run(cmd)
 			Expect(err).NotTo(HaveOccurred(), "Metrics service should exist")
 
-			By("validating that the ServiceMonitor for Prometheus is applied in the namespace")
-			cmd = exec.Command("kubectl", "get", "ServiceMonitor", "-n", namespace)
-			_, err = utils.Run(cmd)
-			Expect(err).NotTo(HaveOccurred(), "ServiceMonitor should exist")
+			if !skipPrometheusInstall {
+				By("validating that the ServiceMonitor for Prometheus is applied in the namespace")
+				cmd = exec.Command("kubectl", "get", "ServiceMonitor", "-n", namespace)
+				_, err = utils.Run(cmd)
+				Expect(err).NotTo(HaveOccurred(), "ServiceMonitor should exist")
+			}
 
 			By("getting the service account token")
 			token, err := serviceAccountToken()
@@ -224,7 +226,7 @@ var _ = Describe("Manager", Ordered, func() {
 							"name": "curl",
 							"image": "curlimages/curl:latest",
 							"command": ["/bin/sh", "-c"],
-							"args": ["curl -v -k -H 'Authorization: Bearer %s' https://%s.%s.svc.cluster.local:8443/metrics"],
+							"args": ["curl -v -k -H 'Authorization: Bearer %s' http://%s.%s.svc.cluster.local:8443/metrics"],
 							"securityContext": {
 								"allowPrivilegeEscalation": false,
 								"capabilities": {
